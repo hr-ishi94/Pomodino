@@ -8,20 +8,29 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary: warm sunset orange (buttons, active states)
+        // Primary: soft violet (buttons, active states)
         focus: {
-          50: '#FFF5EC',
-          100: '#FFE7D1',
-          200: '#FDCBA1',
-          300: '#F9A86B',
-          400: '#F38B45',
-          500: '#EC7430',
-          600: '#E0621F',
-          700: '#BA4D17',
-          800: '#943D17',
-          900: '#773416',
-          950: '#401808',
+          50: '#F4F0FF',
+          100: '#E9E2FF',
+          200: '#D6C9FF',
+          300: '#B9A3FF',
+          400: '#9878FC',
+          500: '#7C5CF8',
+          600: '#6A47EE',
+          700: '#5734CC',
+          800: '#462AA3',
+          900: '#3A2584',
+          950: '#221452',
         },
+        // Lime accent (selected status pill, progress knob)
+        lime: {
+          100: '#F1F5D2',
+          200: '#E4ECA8',
+          300: '#D5E08A',
+          400: '#C7D46E',
+          500: '#AEBF4E',
+        },
+        ink: '#17161D',
         // Deep forest green (habit breaker surface, charts, success)
         forest: {
           50: '#EEF3EC',
@@ -77,29 +86,29 @@ export default {
           600: '#407835',
           700: '#345e2c',
         },
-        // Cream paper + cocoa ink neutrals
+        // Cool lavender-grey neutrals
         warm: {
-          50: '#FBF6EC',
-          100: '#F6EEDF',
-          200: '#EDE1CB',
-          300: '#DDCCAE',
-          400: '#BBA686',
-          500: '#917C60',
-          600: '#6E5B45',
-          700: '#4E3F30',
-          800: '#33291F',
-          850: '#271F18',
-          900: '#1D1712',
-          950: '#110D0A'
+          50: '#F8F6FC',
+          100: '#F1EEF8',
+          200: '#E4E0EF',
+          300: '#CFCADF',
+          400: '#A9A3BC',
+          500: '#827C96',
+          600: '#615C73',
+          700: '#45415A',
+          800: '#2A2733',
+          850: '#211F28',
+          900: '#18171E',
+          950: '#0F0E13'
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       boxShadow: {
-        'soft': '0 2px 10px rgba(86, 60, 30, 0.06)',
-        'lifted': '0 10px 30px rgba(86, 60, 30, 0.12)',
-        'glow': '0 8px 24px rgba(224, 98, 31, 0.32)',
+        'soft': '0 2px 10px rgba(90, 70, 150, 0.06)',
+        'lifted': '0 10px 30px rgba(90, 70, 150, 0.14)',
+        'glow': '0 10px 26px rgba(106, 71, 238, 0.38)',
         'amber-glow': '0 0 25px rgba(245, 183, 0, 0.28)',
       }
     },

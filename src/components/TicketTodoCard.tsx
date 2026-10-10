@@ -23,7 +23,7 @@ export const TicketTodoCard: React.FC<TicketTodoCardProps> = ({ todo, onToggleDo
   const pressTimer = useRef<number | null>(null);
 
   const isDone = todo.status === 'done';
-  const coins = todo.coins || (todo.priority === 'A' ? 30 : todo.priority === 'B' ? 40 : 50);
+  const coins = todo.coins || (todo.priority === 'high' ? 30 : todo.priority === 'medium' ? 40 : 50);
   const subtitle = `Priority ${todo.priority} • ${(todo.category || 'habit') === 'goal' ? 'Goal' : 'Daily habit'}`;
 
   const handleToggle = () => {

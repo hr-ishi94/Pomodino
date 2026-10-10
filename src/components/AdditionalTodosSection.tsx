@@ -21,13 +21,13 @@ export const AdditionalTodosSection: React.FC<AdditionalTodosSectionProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [newText, setNewText] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState<TodoPriority>('A');
+  const [selectedPriority, setSelectedPriority] = useState<TodoPriority>('high');
   const [capWarning, setCapWarning] = useState<string | null>(null);
 
-  const openTodos = todos.filter((t) => t.status === 'open');
-  const aItems = getTodosByPriority(todos, 'A');
-  const bItems = getTodosByPriority(todos, 'B');
-  const cItems = getTodosByPriority(todos, 'C');
+  const openTodos = todos.filter((t) => t.status !== 'done');
+  const aItems = getTodosByPriority(todos, 'high');
+  const bItems = getTodosByPriority(todos, 'medium');
+  const cItems = getTodosByPriority(todos, 'low');
 
   const topAItem = aItems[0];
   const remainingAItems = aItems.slice(1);
@@ -164,8 +164,8 @@ export const AdditionalTodosSection: React.FC<AdditionalTodosSectionProps> = ({
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-warm-400 font-medium">Priority:</span>
               <div className="flex items-center gap-1.5">
-                {(['A', 'B', 'C'] as TodoPriority[]).map((p) => {
-                  const count = p === 'A' ? aItems.length : p === 'B' ? bItems.length : cItems.length;
+                {(['high', 'medium', 'low'] as TodoPriority[]).map((p) => {
+                  const count = p === 'high' ? aItems.length : p === 'medium' ? bItems.length : cItems.length;
                   const isFull = count >= 3;
                   const isSelected = selectedPriority === p;
 
@@ -176,9 +176,9 @@ export const AdditionalTodosSection: React.FC<AdditionalTodosSectionProps> = ({
                       onClick={() => handleSelectPriority(p)}
                       className={`px-2 py-0.5 rounded-md font-bold text-[10px] border transition-all ${
                         isSelected
-                          ? p === 'A'
+                          ? p === 'high'
                             ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200 border-amber-400'
-                            : p === 'B'
+                            : p === 'medium'
                             ? 'bg-sky-100 dark:bg-sky-900/60 text-sky-800 dark:text-sky-200 border-sky-400'
                             : 'bg-warm-200 dark:bg-warm-700 text-warm-800 dark:text-warm-200 border-warm-400'
                           : isFull

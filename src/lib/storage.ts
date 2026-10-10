@@ -369,61 +369,12 @@ export const DEFAULT_STREAK: Streak = {
   lastPausedDate: null,
 };
 
-export const DEFAULT_TODOS: TodoItem[] = [
-  {
-    id: 'habit-tidy',
-    text: 'Tidy up bathroom and bedroom',
-    priority: 'A',
-    status: 'open',
-    coins: 30,
-    category: 'habit',
-    colorTheme: 'amber',
-    createdDate: getTodayDateString(),
-  },
-  {
-    id: 'habit-workout',
-    text: 'Physical activity (sports, workout, etc.)',
-    priority: 'B',
-    status: 'open',
-    coins: 40,
-    category: 'habit',
-    colorTheme: 'yellow',
-    createdDate: getTodayDateString(),
-  },
-  {
-    id: 'habit-hygiene',
-    text: 'Personal hygiene and skincare routine',
-    priority: 'C',
-    status: 'open',
-    coins: 50,
-    category: 'habit',
-    colorTheme: 'green',
-    createdDate: getTodayDateString(),
-  },
-  {
-    id: 'goal-system-design',
-    text: 'Architect scalable real-time streaming pipeline',
-    priority: 'A',
-    status: 'open',
-    coins: 100,
-    category: 'goal',
-    colorTheme: 'amber',
-    createdDate: getTodayDateString(),
-  },
-  {
-    id: 'goal-deep-work',
-    text: 'Complete 4 deep work focus blocks',
-    priority: 'B',
-    status: 'open',
-    coins: 60,
-    category: 'goal',
-    colorTheme: 'yellow',
-    createdDate: getTodayDateString(),
-  },
-];
+export const DEFAULT_PROJECTS: string[] = ['Work', 'Personal', 'Health', 'Learning'];
+
+export const DEFAULT_TODOS: TodoItem[] = [];
 
 export const INITIAL_APP_DATA: AppData = {
-  version: 4,
+  version: 5,
   routineBlocks: DEFAULT_WEEKDAY_BLOCKS,
   routineSets: DEFAULT_ROUTINE_SETS,
   routineSchedule: DEFAULT_ROUTINE_SCHEDULE,
@@ -451,9 +402,10 @@ export const INITIAL_APP_DATA: AppData = {
     lastDate: getTodayDateString(),
     totalCompleted: 0,
   },
-  coins: 25982,
+  coins: 0,
   userName: 'Kendrick',
   redemptions: [],
+  projects: DEFAULT_PROJECTS,
 };
 
 // Default checklist items per block category (used when a block has no custom subtasks)
@@ -474,6 +426,19 @@ export function getBlockSubtasks(block: RoutineBlock): string[] {
 }
 
 export const REWARDS_CATALOG: Reward[] = [
+  // Small everyday treats, reachable in one or a few focus sessions
+  { id: 'reward-stretch', title: 'Stretch Break', cost: 50, emoji: '🧘' },
+  { id: 'reward-song', title: 'Favourite Song', cost: 60, emoji: '🎧' },
+  { id: 'reward-snack', title: 'Tasty Snack', cost: 80, emoji: '🍪' },
+  { id: 'reward-scroll', title: '10 min Scroll', cost: 100, emoji: '📱' },
+  { id: 'reward-tea', title: 'Tea Break', cost: 120, emoji: '🍵' },
+  { id: 'reward-walk', title: 'Short Walk', cost: 150, emoji: '🚶' },
+  { id: 'reward-nap', title: 'Power Nap', cost: 200, emoji: '😴' },
+  { id: 'reward-video', title: 'YouTube Break', cost: 250, emoji: '📺' },
+  { id: 'reward-game-quick', title: 'Quick Game', cost: 300, emoji: '🎲' },
+  { id: 'reward-dessert', title: 'Dessert', cost: 350, emoji: '🍰' },
+  { id: 'reward-episode', title: 'One Episode', cost: 400, emoji: '🍿' },
+  { id: 'reward-sticker', title: 'New Stationery', cost: 450, emoji: '✏️' },
   { id: 'reward-coffee', title: 'Coffee Treat', cost: 500, image: '/art/reward_coffee.png' },
   { id: 'reward-movie', title: 'Movie Night', cost: 1000, image: '/art/reward_movie.png' },
   { id: 'reward-game', title: 'Gaming Session', cost: 1500, image: '/art/reward_game.png' },
@@ -520,6 +485,23 @@ export function getRoutineBlocksForDate(appData: AppData, d: Date = new Date()):
     : DEFAULT_WEEKDAY_BLOCKS;
 }
 
+const LEGACY_PRIORITY: Record<string, TodoPriority> = { A: 'high', B: 'medium', C: 'low' };
+
+/** Upgrades legacy A/B/C + open/done todos to the low/medium/high + status model */
+export function migrateTodo(t: TodoItem): TodoItem {
+  const priority = LEGACY_PRIORITY[t.priority as string] ?? t.priority ?? 'medium';
+  const status = (t.status as string) === 'open' || !t.status ? 'todo' : t.status;
+  return {
+    ...t,
+    priority,
+    status,
+    coins: t.coins ?? (priority === 'high' ? 30 : priority === 'medium' ? 40 : 50),
+    category: t.category ?? 'habit',
+    colorTheme: t.colorTheme ?? (priority === 'high' ? 'amber' : priority === 'medium' ? 'yellow' : 'green'),
+    tags: t.tags ?? [],
+  };
+}
+
 export function loadAppData(): AppData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -558,16 +540,8 @@ export function loadAppData(): AppData {
       return s;
     });
 
-    let rawTodos = Array.isArray(parsed.todos) ? parsed.todos : [];
-    if (rawTodos.length === 0) {
-      rawTodos = DEFAULT_TODOS;
-    }
-    const todos: TodoItem[] = rawTodos.map((t) => ({
-      ...t,
-      coins: t.coins ?? (t.priority === 'A' ? 30 : t.priority === 'B' ? 40 : 50),
-      category: t.category ?? 'habit',
-      colorTheme: t.colorTheme ?? (t.priority === 'A' ? 'amber' : t.priority === 'B' ? 'yellow' : 'green'),
-    }));
+    const rawTodos = Array.isArray(parsed.todos) ? parsed.todos : DEFAULT_TODOS;
+    const todos: TodoItem[] = rawTodos.map(migrateTodo);
 
     // Multiple habits migration
     let habitTrackers = parsed.habitTrackers;
@@ -580,7 +554,7 @@ export function loadAppData(): AppData {
     }
 
     const data: AppData = {
-      version: 4,
+      version: 5,
       routineBlocks: parsed.routineBlocks || DEFAULT_WEEKDAY_BLOCKS,
       routineSets,
       routineSchedule,
@@ -605,9 +579,10 @@ export function loadAppData(): AppData {
         lastDate: getTodayDateString(),
         totalCompleted: 0,
       },
-      coins: typeof parsed.coins === 'number' ? parsed.coins : 25982,
+      coins: typeof parsed.coins === 'number' ? parsed.coins : 0,
       userName: parsed.userName || 'Kendrick',
       redemptions: Array.isArray(parsed.redemptions) ? parsed.redemptions : [],
+      projects: Array.isArray(parsed.projects) && parsed.projects.length > 0 ? parsed.projects : DEFAULT_PROJECTS,
     };
 
     return data;
@@ -745,7 +720,8 @@ export function importAppDataJSON(jsonStr: string): { success: boolean; data?: A
       routineSets: Array.isArray(parsed.routineSets) ? parsed.routineSets : DEFAULT_ROUTINE_SETS,
       routineSchedule: parsed.routineSchedule || DEFAULT_ROUTINE_SCHEDULE,
       sprints: Array.isArray(parsed.sprints) ? parsed.sprints : DEFAULT_SPRINTS,
-      todos: Array.isArray(parsed.todos) ? parsed.todos : [],
+      todos: Array.isArray(parsed.todos) ? parsed.todos.map(migrateTodo) : [],
+      projects: Array.isArray(parsed.projects) ? parsed.projects : DEFAULT_PROJECTS,
       dailyLogs: parsed.dailyLogs || {},
       brainDump: Array.isArray(parsed.brainDump) ? parsed.brainDump : [],
       streak: parsed.streak || DEFAULT_STREAK,
@@ -771,19 +747,19 @@ export function importAppDataJSON(jsonStr: string): { success: boolean; data?: A
  * Returns all active (open) todos.
  */
 export function getActiveTodos(todos: TodoItem[] = []): TodoItem[] {
-  return todos.filter((t) => t.status === 'open');
+  return todos.filter((t) => t.status !== 'done');
 }
 
 /**
- * Returns open todos for a specific priority tier (A, B, or C).
+ * Returns open todos for a specific priority tier (high, medium, or low).
  */
 export function getTodosByPriority(todos: TodoItem[] = [], priority: TodoPriority): TodoItem[] {
-  return todos.filter((t) => t.status === 'open' && t.priority === priority);
+  return todos.filter((t) => t.status !== 'done' && t.priority === priority);
 }
 
 /**
  * Checks whether an item can be added to the given priority tier.
- * Capped at 3 open items per letter (A/B/C).
+ * Capped at 3 open items per tier.
  */
 export function canAddTodo(todos: TodoItem[] = [], priority: TodoPriority): boolean {
   const count = getTodosByPriority(todos, priority).length;
@@ -808,7 +784,7 @@ export function getSittingTodosOver7Days(
 ): TodoItem[] {
   const sevenDaysAgoMs = now.getTime() - 7 * 24 * 60 * 60 * 1000;
   return todos.filter((t) => {
-    if (t.status !== 'open') return false;
+    if (t.status === 'done') return false;
     // Don't repeat if already nudged/reviewed for this week
     if (t.lastNudgeWeekKey === currentWeekKey) return false;
     const createdMs = new Date(t.createdDate).getTime();

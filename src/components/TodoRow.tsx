@@ -20,9 +20,9 @@ export const TodoRow: React.FC<TodoRowProps> = ({
   const isDone = todo.status === 'done';
 
   const badgeColor = {
-    A: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300/70 dark:border-amber-800',
-    B: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-300/70 dark:border-sky-800',
-    C: 'bg-warm-100 dark:bg-warm-800 text-warm-700 dark:text-warm-300 border-warm-300/70 dark:border-warm-700',
+    high: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300/70 dark:border-amber-800',
+    medium: 'bg-sky-100 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-300/70 dark:border-sky-800',
+    low: 'bg-warm-100 dark:bg-warm-800 text-warm-700 dark:text-warm-300 border-warm-300/70 dark:border-warm-700',
   }[todo.priority];
 
   return (
@@ -69,26 +69,26 @@ export const TodoRow: React.FC<TodoRowProps> = ({
       {/* Quick Actions (Change priority / Delete) */}
       {!isDone && (
         <div className="flex items-center gap-1 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          {onChangePriority && todo.priority !== 'C' && (
+          {onChangePriority && todo.priority !== 'low' && (
             <button
               onClick={() => {
-                const nextPriority = todo.priority === 'A' ? 'B' : 'C';
+                const nextPriority = todo.priority === 'high' ? 'medium' : 'low';
                 onChangePriority(todo.id, nextPriority);
               }}
-              title={`Demote to ${todo.priority === 'A' ? 'B' : 'C'}`}
+              title={`Demote to ${todo.priority === 'high' ? 'medium' : 'low'}`}
               className="p-1 text-warm-400 hover:text-warm-700 dark:hover:text-warm-200 rounded transition-colors"
             >
               <ArrowDown className="w-3 h-3" />
             </button>
           )}
 
-          {onChangePriority && todo.priority !== 'A' && (
+          {onChangePriority && todo.priority !== 'high' && (
             <button
               onClick={() => {
-                const prevPriority = todo.priority === 'C' ? 'B' : 'A';
+                const prevPriority = todo.priority === 'low' ? 'medium' : 'high';
                 onChangePriority(todo.id, prevPriority);
               }}
-              title={`Promote to ${todo.priority === 'C' ? 'B' : 'A'}`}
+              title={`Promote to ${todo.priority === 'low' ? 'medium' : 'high'}`}
               className="p-1 text-warm-400 hover:text-warm-700 dark:hover:text-warm-200 rounded transition-colors"
             >
               <ArrowUp className="w-3 h-3" />

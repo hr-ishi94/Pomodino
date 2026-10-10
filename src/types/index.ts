@@ -35,8 +35,8 @@ export type ReviewWhyReason =
 
 export type ReviewMood = "great" | "good" | "okay" | "tough";
 
-export type TodoPriority = "A" | "B" | "C";
-export type TodoStatus = "open" | "done";
+export type TodoPriority = "low" | "medium" | "high";
+export type TodoStatus = "todo" | "in_progress" | "in_review" | "done";
 
 export type TicketColorTheme = "amber" | "yellow" | "green" | "blue";
 export type TodoCategory = "habit" | "goal";
@@ -52,6 +52,11 @@ export type TodoItem = {
   coins?: number; // Coin reward when completed (e.g. 30, 40, 50)
   category?: TodoCategory; // "habit" for Daily habits or "goal" for Goals
   colorTheme?: TicketColorTheme;
+  description?: string;
+  dueDate?: string | null; // "YYYY-MM-DD"
+  dueTime?: string | null; // "HH:MM" (24h)
+  project?: string;
+  tags?: string[];
 };
 
 export type DailyLog = {
@@ -84,7 +89,8 @@ export type Reward = {
   id: string;
   title: string;
   cost: number;
-  image: string; // path under /art
+  image?: string; // path under /art
+  emoji?: string; // shown when there is no artwork
 };
 
 export type RewardRedemption = {
@@ -200,9 +206,11 @@ export type AppData = {
   habitTrackers?: HabitQuitTracker[]; // multiple bad habit cards
   dreamAssessment?: DreamAssessment | null; // Dream & Life Targets assessment
   pomodoroStats?: PomodoroStats;
-  coins?: number; // Total COS coins collected (default 25982)
+  coins?: number; // Total COS coins collected (default 0)
   userName?: string; // Display name on dashboard (default "Kendrick")
+  profileImage?: string; // Profile photo as a compressed JPEG data URL
   redemptions?: RewardRedemption[]; // Rewards Store history
+  projects?: string[]; // Task project names
 };
 
 export type ScreenTab = 
@@ -217,5 +225,6 @@ export type ScreenTab =
   | "settings" 
   | "roadmap"
   | "profile"
-  | "schedule";
+  | "schedule"
+  | "projects";
 
