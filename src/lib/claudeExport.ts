@@ -88,14 +88,14 @@ export function generateClaudeDailyAnalysis(appData: AppData, targetDate?: strin
 
   // Additional To-Dos (ABC)
   const completedTodos = getCompletedTodosForDate(appData.todos, dateStr);
-  const openATodos = getTodosByPriority(appData.todos, 'A');
+  const openATodos = getTodosByPriority(appData.todos, 'high');
 
   const completedTodoLines = completedTodos.length > 0
     ? completedTodos.map((t) => `- ✅ [${t.priority}] ${t.text}`).join('\n')
     : '- None completed today';
 
   const pendingATodoLines = openATodos.length > 0
-    ? openATodos.map((t) => `- ⏳ [A] ${t.text}`).join('\n')
+    ? openATodos.map((t) => `- ⏳ [high] ${t.text}`).join('\n')
     : '- None pending';
 
   return `## 🧠 Daily ADHD Routine Review — ${dayName}, ${formattedDate}

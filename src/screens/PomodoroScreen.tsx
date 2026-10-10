@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { PomodoroStats } from '../types';
-import { Play, Pause, RotateCcw, FastForward, CheckCircle2, ChevronLeft, Leaf } from 'lucide-react';
-import { Trophy, Flame } from '@phosphor-icons/react';
+import { Play, Pause, RotateCcw, FastForward, CheckCircle2, ArrowLeft, Flame, Trophy, Timer, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { soundPlayer } from '../lib/audio';
-import { ART } from '../components/ui';
+import { getTodayDateString } from '../lib/storage';
+import { POMODORO_COINS, POMODORO_BONUS_COINS, POMODORO_BONUS_AT } from '../lib/tasks';
+import { CoinIcon } from '../components/ui';
 
 interface PomodoroScreenProps {
   pomodoroStats?: PomodoroStats;
   onSessionCompleted: () => void;
+  onBack: () => void;
 }
 
 type TimerMode = 'focus' | 'rest' | 'long';
@@ -29,101 +31,145 @@ const MODE_LABEL: Record<TimerMode, string> = {
   long: 'Long Break',
 };
 
-export const PomodoroScreen: React.FC<PomodoroScreenProps> = ({
-  pomodoroStats,
-  onSessionCompleted,
-}) => {
-  const [mode, setMode] = useState<TimerMode>('focus');
-  const [timeLeft, setTimeLeft] = useState<number>(FOCUS_SECONDS);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [showCelebration, setShowCelebration] = useState<boolean>(false);
+/** Running timers store their end time, paused ones the seconds left, so the timer survives tab switches and reloads */
+type TimerState = { mode: TimerMode; endsAt: number | null; remaining: number };
 
+const TIMER_KEY = 'focus-pomodoro-timer';
+
+function loadTimer(): TimerState {
+  try {
+    const saved = JSON.parse(localStorage.getItem(TIMER_KEY) || 'null') as TimerState | null;
+    if (saved && saved.mode in MODE_SECONDS && typeof saved.remaining === 'number') return saved;
+  } catch {
+    // ignore corrupt or unavailable storage
+  }
+  return { mode: 'focus', endsAt: null, remaining: FOCUS_SECONDS };
+}
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
+/** Lime arc on a white track around a violet disc, matching the Home progress ring */
+const TimerRing: React.FC<{ ratio: number; time: string; label: string }> = ({ ratio, time, label }) => {
+  const size = 228;
+  const stroke = 16;
+  const c = size / 2;
+  const r = c - stroke / 2;
+  const len = 2 * Math.PI * r;
+  const angle = ratio * 2 * Math.PI - Math.PI / 2;
+
+  return (
+    <div className="relative shrink-0 select-none" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="block overflow-visible">
+        <defs>
+          <linearGradient id="timer-disc" x1="0.2" y1="0" x2="0.8" y2="1">
+            <stop offset="0%" stopColor="#9A66F0" />
+            <stop offset="55%" stopColor="#AE8AF5" />
+            <stop offset="100%" stopColor="#CDB8FA" />
+          </linearGradient>
+          <linearGradient id="timer-arc" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#E6EEA6" />
+            <stop offset="100%" stopColor="#C4D35E" />
+          </linearGradient>
+        </defs>
+        <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={stroke} />
+        <circle cx={c} cy={c} r={r - stroke / 2 - 6} fill="url(#timer-disc)" stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
+        <circle
+          cx={c}
+          cy={c}
+          r={r}
+          fill="none"
+          stroke="url(#timer-arc)"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={len}
+          strokeDashoffset={len * (1 - ratio)}
+          transform={`rotate(-90 ${c} ${c})`}
+          style={{ transition: 'stroke-dashoffset 1s linear' }}
+        />
+        {ratio > 0 && (
+          <circle cx={c + r * Math.cos(angle)} cy={c + r * Math.sin(angle)} r={8} fill="#FFFFFF" stroke="#C4D35E" strokeWidth={3} />
+        )}
+      </svg>
+      <span className="absolute inset-0 flex flex-col items-center justify-center text-white">
+        <span className="text-[44px] leading-none font-semibold tabular-nums tracking-tight">{time}</span>
+        <span className="mt-2 text-[13px] font-medium text-white/85">{label}</span>
+      </span>
+    </div>
+  );
+};
+
+export const PomodoroScreen: React.FC<PomodoroScreenProps> = ({ pomodoroStats, onSessionCompleted, onBack }) => {
+  const [timer, setTimer] = useState<TimerState>(loadTimer);
+  const [now, setNow] = useState(() => Date.now());
+  const [celebration, setCelebration] = useState<{ coins: number; bonus: number } | null>(null);
+
+  const { mode } = timer;
+  const isRunning = timer.endsAt !== null;
+  const timeLeft = timer.endsAt !== null ? Math.max(0, Math.ceil((timer.endsAt - now) / 1000)) : timer.remaining;
   const totalDuration = MODE_SECONDS[mode];
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleTimerComplete = useCallback(() => {
-    setIsRunning(false);
-    if (mode === 'focus') {
-      soundPlayer.playFocusDoneChime();
-      try {
-        confetti({
-          particleCount: 75,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#E0621F', '#F0B84A', '#8FB085', '#FBBF24'],
-        });
-      } catch {
-        // fallback
-      }
-      setShowCelebration(true);
-      onSessionCompleted();
-      // Transition to rest
-      setMode('rest');
-      setTimeLeft(REST_SECONDS);
-    } else {
-      soundPlayer.playRestDoneChime();
-      setMode('focus');
-      setTimeLeft(FOCUS_SECONDS);
+  // Stats from a previous day don't count towards today
+  const completedToday = pomodoroStats?.lastDate === getTodayDateString() ? pomodoroStats.todayCompleted : 0;
+
+  // Persist every change so the timer keeps going across tabs and reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem(TIMER_KEY, JSON.stringify(timer));
+    } catch {
+      // storage unavailable
     }
-  }, [mode, onSessionCompleted]);
+  }, [timer]);
 
   useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            handleTimerComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning, handleTimerComplete]);
+    if (timer.endsAt === null) return;
+    const endsAt = timer.endsAt;
+    const finishedMode = timer.mode;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t < endsAt) return;
+      clearInterval(id);
+      if (finishedMode === 'focus') {
+        soundPlayer.playFocusDoneChime();
+        try {
+          confetti({ particleCount: 75, spread: 70, origin: { y: 0.6 }, colors: ['#7C5CF8', '#B9A3FF', '#D5E08A', '#FFFFFF'] });
+        } catch {
+          // fallback
+        }
+        // Mirrors the award in App: bonus only on the day's 4th session
+        setCelebration({ coins: POMODORO_COINS, bonus: completedToday + 1 === POMODORO_BONUS_AT ? POMODORO_BONUS_COINS : 0 });
+        onSessionCompleted();
+        setTimer({ mode: 'rest', endsAt: null, remaining: REST_SECONDS });
+      } else {
+        soundPlayer.playRestDoneChime();
+        setTimer({ mode: 'focus', endsAt: null, remaining: FOCUS_SECONDS });
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timer.endsAt, timer.mode, completedToday, onSessionCompleted]);
 
   const handleTogglePlay = () => {
-    setIsRunning((prev) => !prev);
+    const t = Date.now();
+    setNow(t);
+    setTimer((prev) =>
+      prev.endsAt !== null
+        ? { ...prev, endsAt: null, remaining: Math.max(0, Math.ceil((prev.endsAt - t) / 1000)) }
+        : { ...prev, endsAt: t + prev.remaining * 1000 }
+    );
   };
 
-  const handleReset = () => {
-    setIsRunning(false);
-    setTimeLeft(MODE_SECONDS[mode]);
-  };
+  const handleReset = () => setTimer({ mode, endsAt: null, remaining: MODE_SECONDS[mode] });
 
-  const handleSwitchMode = (newMode: TimerMode) => {
-    setIsRunning(false);
-    setMode(newMode);
-    setTimeLeft(MODE_SECONDS[newMode]);
-  };
+  const handleSwitchMode = (newMode: TimerMode) => setTimer({ mode: newMode, endsAt: null, remaining: MODE_SECONDS[newMode] });
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  // Progress ring configuration
-  const size = 220;
-  const stroke = 14;
-  const radius = (size - stroke) / 2;
-  const center = size / 2;
-  const circumference = 2 * Math.PI * radius;
   const progressRatio = Math.max(0, Math.min(1, (totalDuration - timeLeft) / totalDuration));
-  const strokeDashoffset = circumference - progressRatio * circumference;
-
-  const completedToday = pomodoroStats?.todayCompleted || 0;
-  const totalFocusMinutes = completedToday * 25;
-
   const isPaused = !isRunning && timeLeft < totalDuration && timeLeft > 0;
-  const isBreak = mode !== 'focus';
 
-  const bubbleTitle = isBreak ? 'Nice, breathe.' : isRunning ? 'Stay with it!' : "Let's focus!";
-  const bubbleSub = isBreak ? 'Rest your eyes a bit.' : isRunning ? 'One thing at a time.' : 'You can do this.';
+  const totalFocusMinutes = completedToday * (FOCUS_SECONDS / 60);
 
   const modeCards: { key: TimerMode; label: string; mins: number }[] = [
     { key: 'focus', label: 'Focus', mins: FOCUS_SECONDS / 60 },
@@ -132,97 +178,59 @@ export const PomodoroScreen: React.FC<PomodoroScreenProps> = ({
   ];
 
   return (
-    <div className="flex-1 max-w-md mx-auto w-full pb-28 flex flex-col items-center text-center">
-      {/* Top gradient area with header + mascot */}
-      <div className="relative w-full px-4 pt-3 safe-top bg-gradient-to-b from-[#F6E6CC] to-[#F7F0E3] dark:from-warm-900 dark:to-warm-950">
-        <div className="flex items-center justify-between h-10">
-          <span className="w-9 h-9 flex items-center justify-center text-warm-700 dark:text-warm-300" aria-hidden="true">
-            <ChevronLeft className="w-5 h-5" />
-          </span>
-          <h1 className="text-[17px] font-bold text-warm-800 dark:text-warm-100">Focus Timer</h1>
-          <span className="w-9 h-9 flex items-center justify-center text-forest-500 dark:text-forest-400" aria-hidden="true">
-            <Leaf className="w-5 h-5" />
-          </span>
-        </div>
+    <div className="w-full max-w-md mx-auto px-5 pt-6 pb-36 space-y-5">
+      <header className="flex items-center justify-between gap-3">
+        <button type="button" onClick={onBack} aria-label="Back" className="icon-btn text-ink">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-[15px] font-semibold text-ink">Focus Timer</h1>
+        <span className="w-11 h-11 rounded-full bg-white shadow-soft flex items-center justify-center overflow-hidden" aria-hidden>
+          <img src="/pomo-dino.png" alt="" className="w-9 h-9 object-contain" />
+        </span>
+      </header>
 
-        {/* Mascot with speech bubble */}
-        <div className="relative mx-auto mt-2 w-[200px]">
-          <img
-            src={ART.focusMascot}
-            alt="Mascot working on a laptop"
-            className="w-[200px] h-auto rounded-3xl object-cover select-none"
-            style={{
-              WebkitMaskImage: 'radial-gradient(ellipse 72% 72% at 50% 50%, #000 62%, transparent 100%)',
-              maskImage: 'radial-gradient(ellipse 72% 72% at 50% 50%, #000 62%, transparent 100%)',
-            }}
-          />
-          <div
-            key={bubbleTitle}
-            className="absolute -top-1 -right-16 animate-pop-in bg-white dark:bg-warm-800 rounded-2xl rounded-bl-md px-3 py-2 shadow-soft border border-warm-200/70 dark:border-warm-700 text-left"
-          >
-            <strong className="block text-[13px] font-bold text-warm-800 dark:text-warm-100 leading-tight">
-              {bubbleTitle}
-            </strong>
-            <span className="block text-[11px] text-warm-500 dark:text-warm-400 leading-tight mt-0.5">
-              {bubbleSub}
-            </span>
-          </div>
-        </div>
+      <h2 className="text-[27px] leading-[1.2] tracking-tight text-ink">
+        <span className="font-normal">{mode === 'focus' ? "Let's Stay" : 'Time To'}</span>
+        <br />
+        <span className="font-semibold">{mode === 'focus' ? 'Focused' : 'Recharge'}</span>
+      </h2>
+
+      {/* Mode pills */}
+      <div className="no-scrollbar -mx-5 px-5 flex gap-2.5 overflow-x-auto" role="radiogroup" aria-label="Timer mode">
+        {modeCards.map(({ key, label, mins }) => {
+          const active = mode === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => handleSwitchMode(key)}
+              className={`shrink-0 h-11 pl-1.5 pr-4 rounded-full inline-flex items-center gap-2 text-[13px] font-medium text-ink transition-colors ${
+                active ? 'bg-lime-300' : 'pill-surface'
+              }`}
+            >
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold ${active ? 'bg-white' : 'bg-warm-100'}`}>
+                {mins}m
+              </span>
+              {label}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="w-full px-4 flex flex-col items-center space-y-5">
-        {/* Progress ring */}
-        <div className="relative mt-2 select-none" style={{ width: size, height: size }}>
-          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            <defs>
-              <linearGradient id="focusRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#F0B84A" />
-                <stop offset="100%" stopColor="#8FB085" />
-              </linearGradient>
-            </defs>
-            <circle
-              cx={center}
-              cy={center}
-              r={radius}
-              className="stroke-[#EDE1CB] dark:stroke-warm-800"
-              strokeWidth={stroke}
-              fill="transparent"
-            />
-            <circle
-              cx={center}
-              cy={center}
-              r={radius}
-              stroke="url(#focusRingGradient)"
-              strokeWidth={stroke}
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              fill="transparent"
-              transform={`rotate(-90 ${center} ${center})`}
-              className="transition-all duration-1000 ease-linear"
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-[48px] leading-none font-extrabold tabular-nums tracking-tight text-warm-800 dark:text-warm-100">
-              {formatTime(timeLeft)}
-            </span>
-            <span className="text-sm font-medium text-warm-500 dark:text-warm-400 mt-2">{MODE_LABEL[mode]}</span>
-          </div>
-        </div>
+      {/* Timer */}
+      <section className="glass-panel p-6 flex flex-col items-center">
+        <TimerRing ratio={progressRatio} time={formatTime(timeLeft)} label={MODE_LABEL[mode]} />
 
-        {/* Controls */}
-        <div className="w-full flex items-center gap-3">
-          <button
-            onClick={handleReset}
-            className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center bg-white/80 dark:bg-warm-800 border border-warm-200 dark:border-warm-700 text-warm-700 dark:text-warm-200 active:scale-95 transition"
-            title="Reset timer"
-            aria-label="Reset timer"
-          >
+        <div className="mt-6 w-full flex items-center gap-3">
+          <button type="button" onClick={handleReset} className="icon-btn text-ink shrink-0" aria-label="Reset timer" title="Reset timer">
             <RotateCcw className="w-5 h-5" />
           </button>
           <button
+            type="button"
             onClick={handleTogglePlay}
-            className="btn-primary flex-1 py-4 text-lg flex items-center justify-center gap-2"
+            className="btn-brand btn-glow flex-1 h-[52px] text-[15px] font-semibold gap-2"
             aria-label={isRunning ? 'Pause Timer' : 'Start Timer'}
           >
             {isRunning ? (
@@ -236,111 +244,94 @@ export const PomodoroScreen: React.FC<PomodoroScreenProps> = ({
             )}
           </button>
           <button
+            type="button"
             onClick={() => handleSwitchMode(mode === 'focus' ? 'rest' : 'focus')}
-            className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center bg-white/80 dark:bg-warm-800 border border-warm-200 dark:border-warm-700 text-warm-700 dark:text-warm-200 active:scale-95 transition"
-            title="Skip to next session"
+            className="icon-btn text-ink shrink-0"
             aria-label="Skip to next session"
+            title="Skip to next session"
           >
             <FastForward className="w-5 h-5" />
           </button>
         </div>
+      </section>
 
-        {/* Mode cards */}
-        <div className="w-full grid grid-cols-3 gap-3">
-          {modeCards.map(({ key, label, mins }) => {
-            const active = mode === key;
+      {/* Celebration */}
+      {celebration && (
+        <div role="status" className="card p-4 flex items-center gap-3 animate-expand">
+          <span className="w-10 h-10 shrink-0 rounded-full bg-lime-300 text-ink flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[14px] font-semibold text-ink">
+              {celebration.bonus ? `${POMODORO_BONUS_AT} sessions done today!` : 'Focus session complete!'}
+            </span>
+            <span className="mt-0.5 flex items-center gap-1 text-[12px] font-semibold text-focus-600">
+              <CoinIcon className="w-4 h-4" /> +{celebration.coins} coins
+              {celebration.bonus > 0 && <> · +{celebration.bonus} bonus</>}
+            </span>
+            <span className="block text-[12px] text-warm-600">Enjoy your 5-minute rest.</span>
+          </span>
+          <button type="button" onClick={() => setCelebration(null)} aria-label="Dismiss" className="w-9 h-9 rounded-full bg-warm-100 text-ink flex items-center justify-center">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Today's stats */}
+      <section className="card p-4 flex items-center">
+        <div className="flex-1 flex items-center gap-3">
+          <span className="w-10 h-10 shrink-0 rounded-[12px] bg-focus-100 text-focus-600 flex items-center justify-center">
+            <Timer className="w-5 h-5" />
+          </span>
+          <span>
+            <span className="block text-[16px] font-semibold tabular-nums text-ink">{formatTime(totalDuration - timeLeft)}</span>
+            <span className="block text-[11px] text-warm-600">of {formatTime(totalDuration)}</span>
+          </span>
+        </div>
+        <span className="w-px self-stretch mx-3 bg-warm-200" aria-hidden />
+        <div className="flex-1 flex items-center gap-3">
+          <span className="w-10 h-10 shrink-0 rounded-[12px] bg-lime-300/60 text-ink flex items-center justify-center">
+            <Flame className="w-5 h-5" />
+          </span>
+          <span>
+            <span className="block text-[16px] font-semibold tabular-nums text-ink">{totalFocusMinutes}m</span>
+            <span className="block text-[11px] text-warm-600">
+              {completedToday} {completedToday === 1 ? 'session' : 'sessions'} today
+            </span>
+          </span>
+        </div>
+      </section>
+
+      {/* Daily milestones */}
+      <section className="card p-4 flex items-center justify-between">
+        <span className="flex items-center gap-2.5">
+          <span className="w-10 h-10 rounded-[12px] bg-focus-100 text-focus-600 flex items-center justify-center">
+            <Trophy className="w-5 h-5" />
+          </span>
+          <span>
+            <span className="block text-[14px] font-semibold text-ink">Daily Milestones</span>
+            <span className="block text-[11px] text-warm-600">
+              +{POMODORO_COINS} per session · +{POMODORO_BONUS_COINS} at {POMODORO_BONUS_AT}
+            </span>
+          </span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          {[1, 2, 3, 4].map((n) => {
+            const unlocked = completedToday >= n;
             return (
-              <button
-                key={key}
-                onClick={() => handleSwitchMode(key)}
-                className={`card py-3 px-2 flex flex-col items-center transition-all ${
-                  active ? '!bg-white dark:!bg-warm-800 ring-2 ring-focus-500 text-focus-600 dark:text-focus-400' : ''
+              <span
+                key={n}
+                aria-label={`Session ${n} ${unlocked ? 'done' : 'pending'}`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                  unlocked ? 'btn-brand' : 'bg-warm-100 text-warm-400'
                 }`}
-                aria-pressed={active}
               >
-                <span
-                  className={`text-[13px] font-bold ${active ? 'text-focus-600 dark:text-focus-400' : 'text-warm-800 dark:text-warm-100'}`}
-                >
-                  {label}
-                </span>
-                <span
-                  className={`text-xs mt-0.5 ${active ? 'text-focus-500 dark:text-focus-400' : 'text-warm-500 dark:text-warm-400'}`}
-                >
-                  {mins} min
-                </span>
-              </button>
+                <Flame className={`w-4 h-4 ${unlocked ? 'fill-current' : ''}`} />
+              </span>
             );
           })}
-        </div>
-
-        {/* Today's stats */}
-        <div className="w-full card p-4 flex items-center justify-around">
-          <div className="text-center flex-1 border-r border-warm-200 dark:border-warm-700 pr-2">
-            <span className="text-[11px] font-semibold text-warm-500 uppercase tracking-wider block">Session Time</span>
-            <span className="text-xl font-extrabold tabular-nums text-warm-800 dark:text-warm-100 mt-0.5 block">
-              {formatTime(totalDuration - timeLeft)}
-            </span>
-            <span className="text-[11px] text-warm-500 dark:text-warm-400 block mt-0.5">
-              Target: {formatTime(totalDuration)}
-            </span>
-          </div>
-          <div className="text-center flex-1 pl-2">
-            <span className="text-[11px] font-semibold text-warm-500 uppercase tracking-wider block">Total Today</span>
-            <span className="text-xl font-extrabold tabular-nums text-focus-600 dark:text-focus-400 mt-0.5 block">
-              {totalFocusMinutes}m
-            </span>
-            <span className="text-[11px] text-warm-500 dark:text-warm-400 block mt-0.5">
-              {completedToday} {completedToday === 1 ? 'session' : 'sessions'} complete
-            </span>
-          </div>
-        </div>
-
-        {/* Daily milestone streaks */}
-        <div className="w-full card p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Trophy size={20} weight="fill" className="text-honey-500" />
-            <span className="text-xs font-bold text-warm-800 dark:text-warm-100">Daily Milestone Streaks</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {[1, 2, 3, 4].map((sessionNum) => {
-              const isUnlocked = completedToday >= sessionNum;
-              return (
-                <div
-                  key={sessionNum}
-                  className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${
-                    isUnlocked
-                      ? 'bg-focus-600 text-honey-300 shadow-xs'
-                      : 'bg-warm-200/60 dark:bg-warm-800 text-warm-400'
-                  }`}
-                >
-                  <Flame size={14} weight={isUnlocked ? 'fill' : 'regular'} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Celebration Notice */}
-        {showCelebration && (
-          <div className="w-full card-forest p-3.5 rounded-2xl flex items-center justify-between text-xs animate-pop-in">
-            <div className="flex items-center gap-2.5 text-left">
-              <div className="w-8 h-8 rounded-full bg-forest-400 text-white flex items-center justify-center shrink-0">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div>
-                <strong className="block text-xs">Great job! 25-minute focus session complete!</strong>
-                <span className="text-[11px] opacity-80">Enjoy your 5-minute rest.</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowCelebration(false)}
-              className="text-[11px] font-bold hover:underline px-2 py-1"
-            >
-              Close
-            </button>
-          </div>
-        )}
-      </div>
+        </span>
+      </section>
     </div>
   );
 };

@@ -90,9 +90,9 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
   const [activeConvertItemId, setActiveConvertItemId] = useState<string | null>(null);
   const [convertError, setConvertError] = useState<{ id: string; msg: string } | null>(null);
 
-  const aCount = getTodosByPriority(todos, 'A').length;
-  const bCount = getTodosByPriority(todos, 'B').length;
-  const cCount = getTodosByPriority(todos, 'C').length;
+  const aCount = getTodosByPriority(todos, 'high').length;
+  const bCount = getTodosByPriority(todos, 'medium').length;
+  const cCount = getTodosByPriority(todos, 'low').length;
 
   const convertedItems = items.filter((i) => i.convertedToTask);
   const filtered = items.filter((i) => filter === 'all' || i.tag === filter);
@@ -167,9 +167,9 @@ export const InboxScreen: React.FC<InboxScreenProps> = ({
         </div>
       </div>
       <div className="grid grid-cols-4 gap-1.5">
-        {priorityBtn(item, 'A', 'A · Must', aCount, 'bg-honey-100 text-[#8A5A12] dark:bg-honey-500/20 dark:text-honey-300')}
-        {priorityBtn(item, 'B', 'B · Should', bCount, 'bg-[#E3EEFA] text-[#2F6FB0] dark:bg-sky-950/60 dark:text-sky-300')}
-        {priorityBtn(item, 'C', 'C · Nice', cCount, 'bg-warm-100 text-warm-700 dark:bg-warm-800 dark:text-warm-200')}
+        {priorityBtn(item, 'high', 'A · Must', aCount, 'bg-honey-100 text-[#8A5A12] dark:bg-honey-500/20 dark:text-honey-300')}
+        {priorityBtn(item, 'medium', 'B · Should', bCount, 'bg-[#E3EEFA] text-[#2F6FB0] dark:bg-sky-950/60 dark:text-sky-300')}
+        {priorityBtn(item, 'low', 'C · Nice', cCount, 'bg-warm-100 text-warm-700 dark:bg-warm-800 dark:text-warm-200')}
         <button
           type="button"
           onClick={() => onSetAsPrimaryFocus(item)}

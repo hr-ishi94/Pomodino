@@ -1,341 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import type { RoutineBlock, DailyLog, BlockStatus, TodoItem, TodoPriority, TodoCategory, TicketColorTheme, DreamAssessment } from '../types';
-import { formatTimeRange } from '../lib/time';
-import { TicketTodoCard } from '../components/TicketTodoCard';
-import { CreateTicketModal } from '../components/CreateTicketModal';
-import { ART, CoinIcon, SegmentedTabs } from '../components/ui';
-import {
-  Check,
-  CalendarDays,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  CheckCircle2,
-  Sparkles,
-  Split,
-  FastForward,
-  Moon,
-  Settings,
-} from 'lucide-react';
-import confetti from 'canvas-confetti';
+import React, { useMemo, useState } from 'react';
+import { Bell, Plus, ClipboardList, ClipboardCheck, Clipboard } from 'lucide-react';
+import type { TodoItem, TodoStatus } from '../types';
+import { STATUS_ORDER, compareTasks, greeting, isTaskForDay } from '../lib/tasks';
+import { getTodayDateString } from '../lib/storage';
+import { StatusPills, TaskCard } from '../components/TaskCard';
 
 interface TodayScreenProps {
-  routineBlocks: RoutineBlock[];
-  dailyLog: DailyLog;
-  currentBlock: RoutineBlock | null;
-  nextBlock: RoutineBlock | null;
   todos: TodoItem[];
-  dreamAssessment?: DreamAssessment | null;
-  coins?: number;
-  userName?: string;
-  onUpdatePriority: (newPriority: string) => void;
-  onMarkBlockStatus: (blockId: string, status: BlockStatus) => void;
-  onOpenBreakdown: (block: RoutineBlock) => void;
-  onToggleTodo: (id: string, coinsAwarded?: number) => void;
-  onAddTodo: (
-    text: string, 
-    priority: TodoPriority, 
-    coins?: number, 
-    category?: TodoCategory, 
-    colorTheme?: TicketColorTheme
-  ) => boolean;
-  onChangeTodoPriority: (id: string, priority: TodoPriority) => void;
-  onDeleteTodo: (id: string) => void;
-  onNavigateToLearning?: () => void;
-  onOpenEveningReview?: () => void;
-  onOpenProfile?: () => void;
-  onOpenSchedule?: () => void;
+  userName: string;
+  profileImage?: string;
+  currentTime: Date;
+  onAddTask: () => void;
+  onOpenTask: (task: TodoItem) => void;
+  onToggleDone: (id: string) => void;
+  onOpenSchedule: () => void;
+  onViewAll: () => void;
+  onOpenProfile: () => void;
 }
 
-// Custom hook to animate numeric counter smoothly
-function useAnimatedCounter(targetValue: number) {
-  const [currentValue, setCurrentValue] = useState(targetValue);
-  const currentRef = React.useRef(currentValue);
-  currentRef.current = currentValue;
+/** Profile photo when set, otherwise a gradient circle with the user's initial */
+export const InitialAvatar: React.FC<{ name: string; image?: string; size?: number }> = ({ name, image, size = 64 }) =>
+  image ? (
+    <img
+      src={image}
+      alt=""
+      aria-hidden
+      className="rounded-full object-cover border-[3px] border-white shadow-soft"
+      style={{ width: size, height: size }}
+    />
+  ) : (
+    <span
+      className="rounded-full flex items-center justify-center text-white font-bold bg-gradient-to-br from-[#F7B267] via-[#E77FB3] to-[#7C5CF8] border-[3px] border-white shadow-soft"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+      aria-hidden
+    >
+      {(name.trim()[0] || '?').toUpperCase()}
+    </span>
+  );
 
-  useEffect(() => {
-    const startValue = currentRef.current;
-    if (startValue === targetValue) return;
-
-    const duration = 500;
-    const startTime = performance.now();
-
-    const step = (timestamp: number) => {
-      const elapsed = timestamp - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // easeOutQuad
-      const ease = 1 - (1 - progress) * (1 - progress);
-      const val = Math.round(startValue + (targetValue - startValue) * ease);
-      setCurrentValue(val);
-
-      if (progress < 1) {
-        requestAnimationFrame(step);
-      }
-    };
-
-    const anim = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(anim);
-  }, [targetValue]);
-
-  return currentValue;
-}
-
-export const TodayScreen: React.FC<TodayScreenProps> = ({
-  routineBlocks,
-  dailyLog,
-  currentBlock,
-  nextBlock,
-  todos,
-  coins = 25982,
-  userName = 'Kendrick',
-  onMarkBlockStatus,
-  onOpenBreakdown,
-  onToggleTodo,
-  onAddTodo,
-  onDeleteTodo,
-  onOpenEveningReview,
-  onOpenProfile,
-  onOpenSchedule,
-}) => {
-  const [activeTab, setActiveTab] = useState<TodoCategory>('habit');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  const animatedCoins = useAnimatedCounter(coins);
-
-  // Filter todos by category
-  const filteredTodos = todos.filter((t) => (t.category || 'habit') === activeTab);
-  const openCount = filteredTodos.filter((t) => t.status !== 'done').length;
-
-  // Calculate completion ratio
-  const completedCount = todos.filter((t) => t.status === 'done').length;
-  // If baseline matches initial, display 23 / 54 or dynamic
-  const totalDisplayCompleted = 23 + completedCount;
-  const totalDisplayTarget = 54;
-
-  const blocksDone = routineBlocks.filter((b) => dailyLog.blockStatus[b.id] === 'done').length;
-
-  const handleToggleHabit = (id: string, coinsAwarded: number) => {
-    onToggleTodo(id, coinsAwarded);
-  };
-
-  const handleDoneBlock = (blockId: string) => {
-    onMarkBlockStatus(blockId, 'done');
-    confetti({
-      particleCount: 30,
-      spread: 50,
-      origin: { y: 0.7 },
-      colors: ['#F0B84A', '#E0621F', '#FFFFFF'],
-      disableForReducedMotion: true,
-    });
-  };
-
-  const currentStatus = currentBlock ? dailyLog.blockStatus[currentBlock.id] || 'pending' : 'pending';
-  const scheduleBlock = currentBlock || nextBlock;
-  const textShadow = { textShadow: '0 1px 6px rgba(40, 25, 10, 0.45)' };
+/** Lime progress arc on a translucent white track around a violet disc, white knob at the arc's end */
+const ProgressRing: React.FC<{ percent: number }> = ({ percent }) => {
+  const size = 124;
+  const stroke = 13;
+  const c = size / 2;
+  const r = c - stroke / 2;
+  const len = 2 * Math.PI * r;
+  const angle = (percent / 100) * 2 * Math.PI - Math.PI / 2;
+  const knobX = c + r * Math.cos(angle);
+  const knobY = c + r * Math.sin(angle);
 
   return (
-    <div className="min-h-full w-full max-w-md mx-auto flex flex-col pb-28 text-warm-800 dark:text-warm-100">
-      {/* HERO: sunny hills, cottage and coin jar */}
-      <div className="relative w-full h-[235px] overflow-hidden safe-top">
-        <img
-          src={ART.todayHero}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none select-none"
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="block overflow-visible">
+        <defs>
+          <linearGradient id="progress-disc" x1="0.2" y1="0" x2="0.8" y2="1">
+            <stop offset="0%" stopColor="#9A66F0" />
+            <stop offset="55%" stopColor="#AE8AF5" />
+            <stop offset="100%" stopColor="#CDB8FA" />
+          </linearGradient>
+          <linearGradient id="progress-arc" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#E6EEA6" />
+            <stop offset="100%" stopColor="#C4D35E" />
+          </linearGradient>
+        </defs>
+        {/* Track */}
+        <circle cx={c} cy={c} r={r} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth={stroke} />
+        {/* Disc with a soft light rim */}
+        <circle cx={c} cy={c} r={r - stroke / 2 - 4} fill="url(#progress-disc)" stroke="rgba(255,255,255,0.55)" strokeWidth={2} />
+        {/* Progress arc */}
+        <circle
+          cx={c}
+          cy={c}
+          r={r}
+          fill="none"
+          stroke="url(#progress-arc)"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={len}
+          strokeDashoffset={len * (1 - percent / 100)}
+          transform={`rotate(-90 ${c} ${c})`}
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/35 pointer-events-none" />
+        {percent > 0 && <circle cx={knobX} cy={knobY} r={6.5} fill="#FFFFFF" stroke="#C4D35E" strokeWidth={2.5} />}
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-white font-medium tracking-tight">
+        <span className="text-[26px] leading-none">{percent}</span>
+        <span className="text-[15px] leading-none mt-1.5">%</span>
+      </span>
+    </div>
+  );
+};
 
-        {/* Greeting row */}
-        <div className="relative z-10 flex items-start justify-between px-5 pt-4">
-          <button
-            type="button"
-            onClick={onOpenProfile}
-            aria-label="Open profile"
-            className="flex items-center gap-2.5 text-left active:scale-[0.98] transition-transform"
-          >
-            <img src={ART.avatar} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-md bg-honey-100" />
-            <div className="text-white" style={textShadow}>
-              <p className="text-base font-bold leading-tight">Hi {userName} 👋</p>
-              <p className="text-xs font-medium text-white/90">Let's make today count</p>
-            </div>
+const Stat: React.FC<{ icon: React.ReactNode; label: string; value: number }> = ({ icon, label, value }) => (
+  <div className="flex items-center gap-2.5">
+    <span className="w-9 h-9 shrink-0 rounded-full bg-[#D9CCF5]/70 flex items-center justify-center text-[#8C7BB8]">{icon}</span>
+    <div className="leading-tight">
+      <p className="text-[16px] font-semibold text-ink">{value}</p>
+      <p className="text-[11px] text-warm-600">{label}</p>
+    </div>
+  </div>
+);
+
+export const TodayScreen: React.FC<TodayScreenProps> = ({
+  todos,
+  userName,
+  profileImage,
+  currentTime,
+  onAddTask,
+  onOpenTask,
+  onToggleDone,
+  onOpenSchedule,
+  onViewAll,
+  onOpenProfile,
+}) => {
+  const [statusFilter, setStatusFilter] = useState<TodoStatus>('todo');
+  const todayStr = getTodayDateString(currentTime);
+
+  const todaysTasks = useMemo(
+    () => todos.filter((t) => isTaskForDay(t, todayStr, todayStr)).sort(compareTasks),
+    [todos, todayStr]
+  );
+
+  const counts = useMemo(() => {
+    const c = Object.fromEntries(STATUS_ORDER.map((s) => [s, 0])) as Record<TodoStatus, number>;
+    todaysTasks.forEach((t) => (c[t.status] += 1));
+    return c;
+  }, [todaysTasks]);
+
+  const total = todaysTasks.length;
+  const completed = counts.done;
+  const pending = total - completed;
+  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+  const visible = todaysTasks.filter((t) => t.status === statusFilter);
+
+  return (
+    <div className="w-full max-w-md mx-auto px-5 pt-6 pb-32 space-y-6">
+      {/* Header */}
+      <header className="flex items-center justify-between gap-3">
+        <button type="button" onClick={onOpenProfile} className="flex items-center gap-3 min-w-0 text-left">
+          <InitialAvatar name={userName} image={profileImage} size={44} />
+          <span className="min-w-0">
+            <span className="block text-[15px] font-semibold text-ink">{greeting(currentTime)}</span>
+            <span className="block text-[12px] text-warm-600 truncate">{userName}</span>
+          </span>
+        </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button type="button" onClick={onAddTask} aria-label="Add new task" className="btn-brand w-11 h-11">
+            <Plus className="w-5 h-5" />
           </button>
-          <button
-            type="button"
-            onClick={onOpenProfile}
-            aria-label="Settings"
-            className="w-9 h-9 rounded-full bg-white/25 backdrop-blur-md border border-white/40 text-white flex items-center justify-center shadow-sm active:scale-95 transition-transform"
-          >
-            <Settings className="w-[18px] h-[18px]" />
+          <button type="button" onClick={onOpenSchedule} aria-label="Open schedule" className="icon-btn relative text-ink">
+            <Bell className="w-5 h-5" />
+            {pending > 0 && <span className="absolute top-2.5 right-3 w-2 h-2 rounded-full bg-[#E5484D] border-2 border-white" />}
           </button>
         </div>
+      </header>
 
-        {/* Coin stat + completed box */}
-        <div className="absolute z-10 inset-x-0 bottom-7 px-5 flex items-end justify-between gap-3">
-          <div className="text-white" style={textShadow}>
-            <div className="flex items-center gap-2">
-              <CoinIcon className="w-7 h-7 shadow-md" />
-              <span className="text-[28px] font-black tracking-tight leading-none tabular-nums">
-                {animatedCoins.toLocaleString()}
-              </span>
-            </div>
-            <p className="text-xs font-semibold text-white/90 mt-1">COS coins collected</p>
+      <h1 className="text-[27px] leading-[1.2] tracking-tight text-ink">
+        <span className="font-normal">Let's Make</span>
+        <br />
+        <span className="font-semibold">Today Productive</span>
+      </h1>
+
+      {/* Today's Progress */}
+      <section className="glass-panel p-5" aria-label="Today's progress">
+        <h2 className="relative text-[18px] font-semibold tracking-tight text-ink mb-4">Today's Progress</h2>
+        <div className="relative flex items-center">
+          <div className="flex-1 flex justify-center">
+            <ProgressRing percent={percent} />
           </div>
-
-          <div className="shrink-0 rounded-2xl bg-forest-800/80 backdrop-blur-md border border-white/10 px-3 py-1.5 text-white shadow-md">
-            <div className="flex items-center gap-1 text-base font-extrabold leading-tight tabular-nums">
-              <span>
-                {totalDisplayCompleted} / {totalDisplayTarget}
-              </span>
-              <ChevronDown className="w-4 h-4 text-white/80" />
-            </div>
-            <p className="text-[10px] font-medium text-white/75">Completed today</p>
+          <span className="self-stretch w-px mx-3 bg-gradient-to-b from-white/0 via-white to-white/0" aria-hidden />
+          <div className="flex-1 space-y-3.5 pl-2">
+            <Stat icon={<ClipboardList className="w-4 h-4" />} label="Total Task" value={total} />
+            <Stat icon={<ClipboardCheck className="w-4 h-4" />} label="Completed Task" value={completed} />
+            <Stat icon={<Clipboard className="w-4 h-4" />} label="Pending Task" value={pending} />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* CREAM SHEET */}
-      <div className="relative z-20 -mt-4 flex-1 rounded-t-[28px] bg-[#F7F0E3] dark:bg-warm-950 px-5 pt-5 space-y-4">
-        <SegmentedTabs
-          className="w-full"
-          options={[
-            { id: 'habit' as TodoCategory, label: 'Daily habits' },
-            { id: 'goal' as TodoCategory, label: 'Goals' },
-          ]}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
-
+      {/* Today's Tasks */}
+      <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-warm-800 dark:text-warm-50">Top Priorities</h2>
-          <span className="text-xs font-medium text-warm-500 dark:text-warm-400">{openCount} left</span>
+          <h2 className="text-[17px] font-semibold text-ink">Today's Tasks</h2>
+          <button type="button" onClick={onViewAll} className="text-[13px] font-medium text-ink hover:text-focus-600">
+            View All
+          </button>
         </div>
 
-        {/* PRIORITY TICKETS */}
+        <StatusPills counts={counts} value={statusFilter} onChange={setStatusFilter} />
+
         <div className="space-y-3">
-          {filteredTodos.length === 0 ? (
-            <div className="card py-8 text-center text-warm-500 dark:text-warm-400 space-y-2">
-              <Sparkles className="w-6 h-6 mx-auto text-honey-400" />
-              <p className="text-sm font-medium">No {activeTab === 'habit' ? 'habits' : 'goals'} here yet.</p>
-            </div>
-          ) : (
-            filteredTodos.map((todo) => (
-              <TicketTodoCard key={todo.id} todo={todo} onToggleDone={handleToggleHabit} onDelete={onDeleteTodo} />
-            ))
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-warm-300 dark:border-warm-700 hover:border-focus-400 text-focus-600 dark:text-focus-400 font-bold text-sm flex items-center justify-center gap-1.5 transition-all hover:bg-focus-50/60 dark:hover:bg-warm-900 active:scale-[0.99]"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Add {activeTab === 'habit' ? 'Habit' : 'Goal'} Ticket</span>
-          </button>
-        </div>
-
-        {/* TODAY'S SCHEDULE */}
-        <div className="card p-3.5">
-          <button
-            type="button"
-            onClick={onOpenSchedule}
-            className="w-full flex items-center gap-3 text-left"
-            aria-label="Open today's schedule"
-          >
-            <span className="w-11 h-11 rounded-2xl bg-forest-100 dark:bg-forest-900/60 text-forest-700 dark:text-forest-300 flex items-center justify-center shrink-0">
-              <CalendarDays className="w-5 h-5" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-[15px] font-bold text-warm-800 dark:text-warm-50">Today's schedule</p>
-                {currentBlock && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-focus-100 dark:bg-focus-900/40 text-focus-700 dark:text-focus-300">
-                    <span className="w-1.5 h-1.5 rounded-full bg-focus-500 animate-pulse" />
-                    Now
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-warm-500 dark:text-warm-400 truncate">
-                {scheduleBlock
-                  ? `${currentBlock ? '' : 'Next: '}${scheduleBlock.name} • ${formatTimeRange(scheduleBlock.startTime, scheduleBlock.endTime)}`
-                  : `${blocksDone} / ${routineBlocks.length} blocks done`}
-              </p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-warm-400 shrink-0" />
-          </button>
-
-          {currentBlock && (
-            <div className="mt-3 pt-3 border-t border-warm-200 dark:border-warm-800 flex items-center justify-between gap-2">
-              {currentBlock.firstStep ? (
-                <p className="text-xs text-warm-600 dark:text-warm-300 min-w-0 truncate">
-                  <strong>First step:</strong> {currentBlock.firstStep}
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onOpenBreakdown(currentBlock)}
-                  className="inline-flex items-center gap-1 text-xs text-focus-600 dark:text-focus-400 font-semibold min-w-0"
-                >
-                  <Split className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Break down first 10-min step</span>
+          {visible.length === 0 ? (
+            <div className="card p-6 text-center">
+              <p className="text-[13px] text-warm-600">Nothing here yet.</p>
+              {statusFilter === 'todo' && (
+                <button type="button" onClick={onAddTask} className="btn-brand mt-3 h-10 px-5 text-[13px] font-semibold">
+                  Add a task
                 </button>
               )}
-
-              {currentStatus === 'done' ? (
-                <span className="flex items-center gap-1 text-xs font-bold text-forest-600 dark:text-forest-300 shrink-0">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Done
-                </span>
-              ) : (
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleDoneBlock(currentBlock.id)}
-                    className="btn-pill inline-flex items-center gap-1"
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    Done
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMarkBlockStatus(currentBlock.id, 'skipped')}
-                    aria-label="Skip block"
-                    title="Skip"
-                    className="p-1.5 rounded-full bg-warm-100 dark:bg-warm-800 text-warm-600 dark:text-warm-300"
-                  >
-                    <FastForward className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
             </div>
+          ) : (
+            visible.map((t) => <TaskCard key={t.id} task={t} onOpen={onOpenTask} onToggleDone={onToggleDone} />)
           )}
         </div>
-
-        {/* EVENING REVIEW ENTRY */}
-        {onOpenEveningReview && (
-          <button
-            type="button"
-            onClick={onOpenEveningReview}
-            className="card w-full p-3.5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
-          >
-            <span className="w-11 h-11 rounded-2xl bg-forest-800 text-honey-300 flex items-center justify-center shrink-0">
-              <Moon className="w-5 h-5" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-bold text-warm-800 dark:text-warm-50">Evening review</p>
-              <p className="text-xs text-warm-500 dark:text-warm-400 truncate">Reflect on your day in 2 minutes</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-warm-400 shrink-0" />
-          </button>
-        )}
-      </div>
-
-      {/* CREATE TICKET MODAL */}
-      <CreateTicketModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        defaultCategory={activeTab}
-        onAdd={onAddTodo}
-      />
+      </section>
     </div>
   );
 };

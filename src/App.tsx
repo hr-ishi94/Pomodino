@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { SplashScreen } from './components/SplashScreen';
 import type { 
   AppData, 
   ScreenTab, 
@@ -9,12 +10,12 @@ import type {
   Streak,
   TodoItem,
   TodoPriority,
-  TodoCategory,
-  TicketColorTheme,
+  TodoStatus,
   HabitQuitTracker,
   DreamAssessment,
   BrainDumpTag,
-  Reward
+  Reward,
+  DayOfWeek
 } from './types';
 import { 
   loadAppData, 
@@ -25,16 +26,15 @@ import {
   INITIAL_APP_DATA,
   getRoutineBlocksForDate,
   checkAndRunAutoWeeklyBackup,
-  canAddTodo,
   DEFAULT_HABIT_TRACKERS,
+  DEFAULT_PROJECTS,
   getBlockSubtasks
 } from './lib/storage';
+import { PRIORITY_COINS, POMODORO_COINS, POMODORO_BONUS_COINS, POMODORO_BONUS_AT } from './lib/tasks';
 import { autoResolveMissedBlocks } from './lib/autoResolve';
 import { getCurrentAndNextBlock, getWeekKey } from './lib/time';
 import { notifications } from './lib/notifications';
 import { Navigation } from './components/Navigation';
-import { BrainDumpFAB } from './components/BrainDumpFAB';
-import { BrainDumpModal } from './components/BrainDumpModal';
 import { BreakdownModal } from './components/BreakdownModal';
 import { BannerNotification } from './components/BannerNotification';
 import { ToastUndo } from './components/ToastUndo';
@@ -49,6 +49,9 @@ import { HabitBreakerScreen } from './screens/HabitBreakerScreen';
 import { MoreHubScreen } from './screens/MoreHubScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { DayScheduleScreen } from './screens/DayScheduleScreen';
+import { ProjectsScreen } from './screens/ProjectsScreen';
+import { TaskFormScreen, type TaskDraft } from './screens/TaskFormScreen';
+import { RoutineEditorScreen } from './screens/RoutineEditorScreen';
 import { TaskCompletedModal } from './components/TaskCompletedModal';
 import { Download, X } from 'lucide-react';
 
@@ -58,14 +61,17 @@ interface UndoState {
   action: BlockStatus;
   previousStreak: Streak;
   isTodo?: boolean;
+  previousTodoStatus?: TodoStatus;
 }
 
 export function App() {
   const [appData, setAppData] = useState<AppData>(() => loadAppData());
   const [currentTab, setCurrentTab] = useState<ScreenTab>('today');
+  const [showSplash, setShowSplash] = useState(true);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
-  const [brainDumpOpen, setBrainDumpOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState<{ task: TodoItem | null; dueDate: string } | null>(null);
   const [breakdownBlock, setBreakdownBlock] = useState<RoutineBlock | null>(null);
+  const [routineEditDate, setRoutineEditDate] = useState<Date | null>(null);
   const [bannerBlock, setBannerBlock] = useState<RoutineBlock | null>(null);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
   const [autoBackupNotice, setAutoBackupNotice] = useState(false);
@@ -91,10 +97,14 @@ export function App() {
       const today = getTodayDateString();
       const prevStats = prev.pomodoroStats || { todayCompleted: 0, lastDate: today, totalCompleted: 0 };
       const isSameDay = prevStats.lastDate === today;
+      const todayCompleted = isSameDay ? prevStats.todayCompleted + 1 : 1;
+      // The count only reaches the bonus mark once per day, so the bonus is paid once
+      const earned = POMODORO_COINS + (todayCompleted === POMODORO_BONUS_AT ? POMODORO_BONUS_COINS : 0);
       return {
         ...prev,
+        coins: (prev.coins ?? 0) + earned,
         pomodoroStats: {
-          todayCompleted: isSameDay ? prevStats.todayCompleted + 1 : 1,
+          todayCompleted,
           lastDate: today,
           totalCompleted: prevStats.totalCompleted + 1,
         },
@@ -107,25 +117,10 @@ export function App() {
     saveAppData(appData);
   }, [appData]);
 
-  // Apply theme class (system, light, dark)
+  // The redesigned screens are light-only
   useEffect(() => {
-    const root = document.documentElement;
-    const theme = appData.settings.theme;
-
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else if (theme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      // System preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDark) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-  }, [appData.settings.theme]);
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   // P0 #1: Check and run automatic weekly backup export on app mount
   useEffect(() => {
@@ -148,6 +143,7 @@ export function App() {
 
   // Resolve today's routine blocks based on current day of week
   const todayBlocks = getRoutineBlocksForDate(appData, currentTime);
+  const getBlocksForDate = useCallback((d: Date) => getRoutineBlocksForDate(appData, d), [appData]);
 
   // P0 #2: Auto-resolve missed blocks whose grace period (+30m) has passed
   useEffect(() => {
@@ -159,7 +155,7 @@ export function App() {
   }, [currentTime]);
 
   // Compute current and next block
-  const { currentBlock, nextBlock } = getCurrentAndNextBlock(todayBlocks, currentTime);
+  const { currentBlock } = getCurrentAndNextBlock(todayBlocks, currentTime);
 
   // Today's log
   const todayStr = getTodayDateString(currentTime);
@@ -260,23 +256,22 @@ export function App() {
     });
   };
 
-  // Priority Tickets / To-Dos Handlers
-  const handleAddTodo = (
-    text: string, 
-    priority: TodoPriority,
-    coins?: number,
-    category?: TodoCategory,
-    colorTheme?: TicketColorTheme
-  ): boolean => {
+  // Task handlers
+  const handleAddTodo = (draft: Partial<TaskDraft> & Pick<TaskDraft, 'text' | 'priority'>): boolean => {
     const newTodo: TodoItem = {
       id: `todo-${Date.now()}`,
-      text: text.trim(),
-      priority,
-      status: 'open',
+      status: 'todo',
       createdDate: todayStr,
-      coins: coins ?? (priority === 'A' ? 30 : priority === 'B' ? 40 : 50),
-      category: category ?? 'habit',
-      colorTheme: colorTheme ?? (priority === 'A' ? 'amber' : priority === 'B' ? 'yellow' : 'green'),
+      coins: PRIORITY_COINS[draft.priority],
+      category: 'habit',
+      colorTheme: 'blue',
+      description: '',
+      dueDate: null,
+      dueTime: null,
+      project: undefined,
+      tags: [],
+      ...draft,
+      text: draft.text.trim(),
     };
     setAppData((prev) => ({
       ...prev,
@@ -285,39 +280,46 @@ export function App() {
     return true;
   };
 
-  const handleToggleTodo = (id: string, coinsDelta?: number) => {
+  /** Applies a patch to a task, granting or taking back coins when it crosses into/out of Done */
+  const applyTodoPatch = (id: string, patch: Partial<TodoItem>, coinsOverride?: number) => {
     const targetTodo = appData.todos.find((t) => t.id === id);
     if (!targetTodo) return;
 
-    const willBeDone = targetTodo.status !== 'done';
-    const amount = coinsDelta !== undefined ? coinsDelta : (targetTodo.coins || 30);
+    const wasDone = targetTodo.status === 'done';
+    const nextStatus = patch.status ?? targetTodo.status;
+    const willBeDone = nextStatus === 'done';
+    const amount = Math.abs(coinsOverride ?? targetTodo.coins ?? PRIORITY_COINS[targetTodo.priority]);
 
-    if (willBeDone) {
-      setCelebration({ name: targetTodo.text, coins: Math.abs(amount) });
+    if (!wasDone && willBeDone) {
+      setCelebration({ name: patch.text ?? targetTodo.text, coins: amount });
       setUndoState({
         blockId: id,
-        blockName: targetTodo.text,
+        blockName: patch.text ?? targetTodo.text,
         action: 'done',
         previousStreak: { ...appData.streak },
         isTodo: true,
+        previousTodoStatus: targetTodo.status,
       });
     }
 
     setAppData((prev) => {
-      const currentCoins = prev.coins ?? 25982;
-      const newCoins = willBeDone 
-        ? currentCoins + Math.abs(amount)
-        : Math.max(0, currentCoins - Math.abs(amount));
+      const currentCoins = prev.coins ?? 0;
+      const coins =
+        !wasDone && willBeDone
+          ? currentCoins + amount
+          : wasDone && !willBeDone
+            ? Math.max(0, currentCoins - amount)
+            : currentCoins;
 
       return {
         ...prev,
-        coins: newCoins,
+        coins,
         todos: prev.todos.map((t) =>
           t.id === id
             ? {
                 ...t,
-                status: willBeDone ? 'done' : 'open',
-                completedDate: willBeDone ? todayStr : null,
+                ...patch,
+                completedDate: willBeDone ? (wasDone ? t.completedDate : todayStr) : null,
               }
             : t
         ),
@@ -325,15 +327,31 @@ export function App() {
     });
   };
 
-  const handleChangeTodoPriority = (id: string, newPriority: TodoPriority) => {
-    if (!canAddTodo(appData.todos, newPriority)) {
-      return;
-    }
-    setAppData((prev) => ({
-      ...prev,
-      todos: prev.todos.map((t) => (t.id === id ? { ...t, priority: newPriority } : t)),
-    }));
+  const handleToggleTodo = (id: string, coinsDelta?: number) => {
+    const targetTodo = appData.todos.find((t) => t.id === id);
+    if (!targetTodo) return;
+    applyTodoPatch(id, { status: targetTodo.status === 'done' ? 'todo' : 'done' }, coinsDelta);
   };
+
+  const handleUpdateTodo = (id: string, draft: TaskDraft) => {
+    applyTodoPatch(id, { ...draft, coins: PRIORITY_COINS[draft.priority] });
+  };
+
+  const handleSaveTaskForm = (draft: TaskDraft) => {
+    if (taskForm?.task) handleUpdateTodo(taskForm.task.id, draft);
+    else handleAddTodo(draft);
+    setTaskForm(null);
+  };
+
+  const handleAddProject = (name: string) => {
+    setAppData((prev) => {
+      const list = prev.projects ?? DEFAULT_PROJECTS;
+      return list.includes(name) ? prev : { ...prev, projects: [...list, name] };
+    });
+  };
+
+  const openNewTask = (dueDate: string = todayStr) => setTaskForm({ task: null, dueDate });
+  const openTask = (task: TodoItem) => setTaskForm({ task, dueDate: task.dueDate ?? '' });
 
   const handleDeleteTodo = (id: string) => {
     setAppData((prev) => ({
@@ -360,7 +378,7 @@ export function App() {
           return { ...t, lastNudgeWeekKey: currentWeekKey };
         }
         if (action === 'demote') {
-          return { ...t, priority: 'C', lastNudgeWeekKey: currentWeekKey };
+          return { ...t, priority: 'low', lastNudgeWeekKey: currentWeekKey };
         }
         if (action === 'done') {
           return { ...t, status: 'done', completedDate: todayStr, lastNudgeWeekKey: currentWeekKey };
@@ -380,9 +398,11 @@ export function App() {
         const reward = targetTodo?.coins || 30;
         return {
           ...prev,
-          coins: Math.max(0, (prev.coins ?? 25982) - reward),
+          coins: Math.max(0, (prev.coins ?? 0) - reward),
           todos: prev.todos.map((t) =>
-            t.id === undoState.blockId ? { ...t, status: 'open', completedDate: null } : t
+            t.id === undoState.blockId
+              ? { ...t, status: undoState.previousTodoStatus ?? 'todo', completedDate: null }
+              : t
           ),
         };
       });
@@ -458,13 +478,27 @@ export function App() {
     }));
   };
 
+  // Routine editor (Calendar): replaces the blocks of the routine set used on that weekday
+  const routineSetIdFor = (d: Date) => appData.routineSchedule?.[d.getDay() as DayOfWeek] || 'set-weekday';
+
+  const handleSaveRoutine = (d: Date, blocks: RoutineBlock[]) => {
+    const setId = routineSetIdFor(d);
+    setAppData((prev) => ({
+      ...prev,
+      routineSets: prev.routineSets.some((s) => s.id === setId)
+        ? prev.routineSets.map((s) => (s.id === setId ? { ...s, blocks } : s))
+        : [...prev.routineSets, { id: setId, name: 'Routine', blocks }],
+    }));
+    setRoutineEditDate(null);
+  };
+
   // Rewards Store
   const handleRedeemReward = (reward: Reward): boolean => {
-    const balance = appData.coins ?? 25982;
+    const balance = appData.coins ?? 0;
     if (balance < reward.cost) return false;
     setAppData((prev) => ({
       ...prev,
-      coins: Math.max(0, (prev.coins ?? 25982) - reward.cost),
+      coins: Math.max(0, (prev.coins ?? 0) - reward.cost),
       redemptions: [
         { id: `redeem-${Date.now()}`, rewardId: reward.id, cost: reward.cost, redeemedAt: new Date().toISOString() },
         ...(prev.redemptions || []),
@@ -515,7 +549,7 @@ export function App() {
   };
 
   const handleConvertToTodo = (item: BrainDumpItem, priority: TodoPriority): boolean => {
-    const added = handleAddTodo(item.text, priority);
+    const added = handleAddTodo({ text: item.text, priority });
     if (added) {
       setAppData((prev) => ({
         ...prev,
@@ -571,7 +605,8 @@ export function App() {
   const unreadDumpsCount = appData.brainDump.filter((i) => !i.convertedToTask).length;
 
   return (
-    <div className="min-h-full flex flex-col bg-[#F7F0E3] dark:bg-warm-950 text-warm-800 dark:text-warm-100 transition-colors relative selection:bg-focus-200 selection:text-warm-900">
+    <div className="min-h-full flex flex-col text-ink transition-colors relative selection:bg-focus-200 selection:text-warm-900">
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {/* Auto Backup Notification Banner */}
       {autoBackupNotice && (
         <div className="fixed top-3 left-3 right-3 z-50 max-w-sm mx-auto bg-warm-900 text-white dark:bg-warm-100 dark:text-warm-900 px-3.5 py-2.5 rounded-xl shadow-lifted border border-focus-500/50 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-2">
@@ -601,38 +636,44 @@ export function App() {
       <main className="flex-1 flex flex-col w-full">
         {currentTab === 'today' && (
           <TodayScreen
-            routineBlocks={todayBlocks}
-            dailyLog={dailyLog}
-            currentBlock={currentBlock}
-            nextBlock={nextBlock}
             todos={appData.todos}
-            coins={appData.coins ?? 25982}
             userName={appData.userName ?? 'Kendrick'}
-            dreamAssessment={appData.dreamAssessment}
-            onUpdatePriority={handleUpdatePriority}
-            onMarkBlockStatus={handleMarkBlockStatus}
-            onOpenBreakdown={(block) => setBreakdownBlock(block)}
-            onToggleTodo={handleToggleTodo}
-            onAddTodo={handleAddTodo}
-            onChangeTodoPriority={handleChangeTodoPriority}
-            onDeleteTodo={handleDeleteTodo}
-            onNavigateToLearning={() => setCurrentTab('learning')}
-            onOpenEveningReview={() => setCurrentTab('review')}
-            onOpenProfile={() => setCurrentTab('profile')}
+            profileImage={appData.profileImage}
+            currentTime={currentTime}
+            onAddTask={() => openNewTask()}
+            onOpenTask={openTask}
+            onToggleDone={(id) => handleToggleTodo(id)}
             onOpenSchedule={() => setCurrentTab('schedule')}
+            onViewAll={() => setCurrentTab('projects')}
+            onOpenProfile={() => setCurrentTab('profile')}
+          />
+        )}
+
+        {currentTab === 'projects' && (
+          <ProjectsScreen
+            todos={appData.todos}
+            projects={appData.projects ?? DEFAULT_PROJECTS}
+            onAddTask={() => openNewTask()}
+            onOpenTask={openTask}
+            onToggleDone={(id) => handleToggleTodo(id)}
+            onBack={() => setCurrentTab('today')}
           />
         )}
 
         {currentTab === 'schedule' && (
           <DayScheduleScreen
-            routineBlocks={todayBlocks}
-            dailyLog={dailyLog}
+            todos={appData.todos}
+            dailyLogs={appData.dailyLogs}
+            getBlocksForDate={getBlocksForDate}
             currentBlock={currentBlock}
             currentTime={currentTime}
             onToggleSubtask={handleToggleSubtask}
             onAddSubtask={handleAddSubtask}
             onMarkBlockStatus={handleMarkBlockStatus}
             onOpenBreakdown={(block) => setBreakdownBlock(block)}
+            onEditRoutine={setRoutineEditDate}
+            onOpenTask={openTask}
+            onAddTask={openNewTask}
             onBack={() => setCurrentTab('today')}
           />
         )}
@@ -640,12 +681,13 @@ export function App() {
         {currentTab === 'profile' && (
           <ProfileScreen
             userName={appData.userName ?? 'Kendrick'}
-            coins={appData.coins ?? 25982}
+            profileImage={appData.profileImage}
+            coins={appData.coins ?? 0}
             streak={appData.streak}
             habitTrackers={appData.habitTrackers || DEFAULT_HABIT_TRACKERS}
             redemptions={appData.redemptions || []}
             onRedeem={handleRedeemReward}
-            onOpenSettings={() => setCurrentTab('settings')}
+            onUpdateProfile={({ userName, profileImage }) => setAppData((prev) => ({ ...prev, userName, profileImage }))}
             onBack={() => setCurrentTab('today')}
           />
         )}
@@ -654,6 +696,7 @@ export function App() {
           <PomodoroScreen
             pomodoroStats={appData.pomodoroStats}
             onSessionCompleted={handlePomodoroSessionCompleted}
+            onBack={() => setCurrentTab('today')}
           />
         )}
 
@@ -745,15 +788,31 @@ export function App() {
         onClose={() => setCelebration(null)}
       />
 
-      {/* Floating Action Button for instant Brain Dump on every screen */}
-      <BrainDumpFAB onClick={() => setBrainDumpOpen(true)} />
+      {/* Add / Edit Task */}
+      {routineEditDate && (
+        <RoutineEditorScreen
+          routineName={appData.routineSets.find((s) => s.id === routineSetIdFor(routineEditDate))?.name ?? 'Daily'}
+          blocks={getBlocksForDate(routineEditDate)}
+          onSave={(blocks) => handleSaveRoutine(routineEditDate, blocks)}
+          onClose={() => setRoutineEditDate(null)}
+        />
+      )}
 
-      {/* Brain Dump Modal */}
-      <BrainDumpModal
-        isOpen={brainDumpOpen}
-        onClose={() => setBrainDumpOpen(false)}
-        onSave={handleSaveBrainDump}
-      />
+      {taskForm && (
+        <TaskFormScreen
+          key={taskForm.task?.id ?? 'new'}
+          task={taskForm.task}
+          defaultDueDate={taskForm.dueDate}
+          projects={appData.projects ?? DEFAULT_PROJECTS}
+          onSave={handleSaveTaskForm}
+          onDelete={(id) => {
+            handleDeleteTodo(id);
+            setTaskForm(null);
+          }}
+          onAddProject={handleAddProject}
+          onClose={() => setTaskForm(null)}
+        />
+      )}
 
       {/* Task Breakdown Modal */}
       <BreakdownModal
@@ -764,11 +823,7 @@ export function App() {
       />
 
       {/* Bottom Navigation */}
-      <Navigation
-        currentTab={currentTab}
-        onTabChange={setCurrentTab}
-        inboxCount={unreadDumpsCount}
-      />
+      <Navigation currentTab={currentTab} onTabChange={setCurrentTab} />
     </div>
   );
 }

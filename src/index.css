@@ -4,12 +4,12 @@
 
 @layer base {
   :root {
-    --color-warm-bg: #F7F0E3;
-    --color-card-bg: #FFFCF6;
-    --color-text-main: #33291F;
-    --color-text-muted: #917C60;
-    --color-border: #EDE1CB;
-    --color-accent: #E0621F;
+    --color-warm-bg: #EFE8F6;
+    --color-card-bg: #FFFFFF;
+    --color-text-main: #17161D;
+    --color-text-muted: #827C96;
+    --color-border: #E4E0EF;
+    --color-accent: #6A47EE;
     --color-amber: #F0B84A;
   }
 
@@ -25,8 +25,13 @@
 
   html, body {
     background-color: var(--color-warm-bg);
+    background-image:
+      radial-gradient(120% 60% at 0% 0%, #F7DCD4 0%, rgba(247, 220, 212, 0) 55%),
+      radial-gradient(90% 55% at 100% 0%, #EBCBEF 0%, rgba(235, 203, 239, 0) 60%),
+      radial-gradient(120% 70% at 50% 100%, #E2D6F7 0%, rgba(226, 214, 247, 0) 70%);
+    background-attachment: fixed;
     color: var(--color-text-main);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     touch-action: manipulation;
@@ -47,16 +52,115 @@
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* ---------- Storybook cream design system ---------- */
+/* ---------- Lavender glass design system ---------- */
 
-/* Base cream card (kept under the legacy glass-* names so every screen shares it) */
+/* Base white card (kept under the legacy glass-* names so every screen shares it) */
 .glass-card,
 .card {
-  background: #FFFCF6;
-  border: 1px solid #F0E6D3;
+  background: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 22px;
-  box-shadow: 0 6px 18px -8px rgba(86, 60, 30, 0.16), 0 1px 2px rgba(86, 60, 30, 0.05);
+  box-shadow: 0 14px 34px -18px rgba(96, 72, 170, 0.28), 0 1px 2px rgba(96, 72, 170, 0.04);
 }
+
+/* Frosted gradient panel with diagonal light streaks (Today's Progress) */
+.glass-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background:
+    radial-gradient(70% 90% at 55% 55%, rgba(205, 186, 255, 0.55) 0%, rgba(205, 186, 255, 0) 70%),
+    linear-gradient(135deg, rgba(255, 233, 240, 0.75) 0%, rgba(240, 232, 255, 0.7) 55%, rgba(232, 222, 255, 0.75) 100%);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: 0 18px 40px -22px rgba(96, 72, 170, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -10%;
+  width: 70%;
+  height: 90%;
+  background: repeating-linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0) 0px,
+    rgba(255, 255, 255, 0) 18px,
+    rgba(255, 255, 255, 0.45) 26px,
+    rgba(255, 255, 255, 0) 40px
+  );
+  filter: blur(6px);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* White pill / round surfaces (status pills, week days, icon buttons) */
+.pill-surface {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 20px -14px rgba(96, 72, 170, 0.35);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  color: #17161D;
+  box-shadow: 0 10px 24px -14px rgba(96, 72, 170, 0.45);
+  transition: transform 0.15s ease;
+}
+.icon-btn:active { transform: scale(0.94); }
+
+/* Violet round action (+) */
+.btn-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #8467FA 0%, #6A47EE 100%);
+  color: #FFFFFF;
+  box-shadow: 0 12px 26px -10px rgba(106, 71, 238, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.btn-brand:hover { filter: brightness(1.05); }
+.btn-brand:active { transform: scale(0.95); }
+.btn-brand:disabled { opacity: 0.5; }
+
+/* Form fields on the Add Task screen */
+.field {
+  width: 100%;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  height: 48px;
+  padding: 0 1.25rem;
+  font-size: 14px;
+  color: #17161D;
+  box-shadow: 0 8px 20px -16px rgba(96, 72, 170, 0.35);
+}
+.field::placeholder { color: #8E89A0; }
+.field:focus { outline: none; border-color: #B9A3FF; }
+textarea.field { height: auto; padding: 0.875rem 1.25rem; }
+
+/* Violet glow under the primary Create button */
+.btn-glow { box-shadow: 0 18px 30px -12px rgba(106, 71, 238, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+
+/* Same lavender wash as the body, for full-screen overlays */
+.app-bg {
+  background-color: var(--color-warm-bg);
+  background-image:
+    radial-gradient(120% 60% at 0% 0%, #F7DCD4 0%, rgba(247, 220, 212, 0) 55%),
+    radial-gradient(90% 55% at 100% 0%, #EBCBEF 0%, rgba(235, 203, 239, 0) 60%),
+    radial-gradient(120% 70% at 50% 100%, #E2D6F7 0%, rgba(226, 214, 247, 0) 70%);
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 .dark .glass-card,
 .dark .card {
@@ -95,20 +199,20 @@
   justify-content: center;
   gap: 0.5rem;
   border-radius: 9999px;
-  background: linear-gradient(180deg, #F38B45 0%, #E0621F 100%);
+  background: linear-gradient(180deg, #8467FA 0%, #6A47EE 100%);
   color: #fff;
   font-weight: 700;
-  box-shadow: 0 8px 20px -6px rgba(224, 98, 31, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 10px 24px -8px rgba(106, 71, 238, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 .btn-primary:hover { filter: brightness(1.04); }
 .btn-primary:active { transform: scale(0.97); }
 .btn-primary:disabled { opacity: 0.5; }
 
-/* Small orange redeem / action pill */
+/* Small violet redeem / action pill */
 .btn-pill {
   border-radius: 9999px;
-  background: #E8702A;
+  background: #6A47EE;
   color: #fff;
   font-weight: 700;
   font-size: 12px;
@@ -116,7 +220,7 @@
   transition: transform 0.15s ease;
 }
 .btn-pill:active { transform: scale(0.95); }
-.btn-pill:disabled { background: #DDCCAE; color: #917C60; }
+.btn-pill:disabled { background: #E4E0EF; color: #827C96; }
 
 /* Segmented control track + items */
 .seg {
@@ -125,7 +229,7 @@
   grid-auto-columns: 1fr;
   padding: 4px;
   border-radius: 9999px;
-  background: #EFE5D3;
+  background: rgba(255, 255, 255, 0.6);
 }
 .dark .seg { background: #2C2219; }
 .seg-dark { background: rgba(255, 255, 255, 0.08); }
@@ -134,13 +238,13 @@
   padding: 0.5rem 0.75rem;
   font-size: 13px;
   font-weight: 600;
-  color: #917C60;
+  color: #827C96;
   transition: all 0.2s ease;
 }
 .seg-item-active {
-  background: #FFFCF6;
-  color: #33291F;
-  box-shadow: 0 2px 8px rgba(86, 60, 30, 0.14);
+  background: #FFFFFF;
+  color: #17161D;
+  box-shadow: 0 2px 8px rgba(96, 72, 170, 0.16);
 }
 .dark .seg-item-active { background: #3A2E22; color: #F6EEDF; }
 .seg-dark .seg-item { color: rgba(246, 238, 223, 0.7); }
@@ -156,7 +260,7 @@
   color: #6E5B45;
   white-space: nowrap;
 }
-.chip-active { background: #33291F; color: #FFFCF6; }
+.chip-active { background: #17161D; color: #FFFFFF; }
 .dark .chip { background: #2C2219; color: #BBA686; }
 .dark .chip-active { background: #F6EEDF; color: #1D1712; }
 
@@ -165,8 +269,8 @@
   width: 22px;
   height: 22px;
   border-radius: 7px;
-  border: 1.5px solid #CDBB9C;
-  background: #FFFCF6;
+  border: 1.5px solid #CFCADF;
+  background: #FFFFFF;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -174,8 +278,8 @@
   transition: all 0.15s ease;
 }
 .check-box[data-checked="true"] {
-  background: #2F6FB0;
-  border-color: #2F6FB0;
+  background: #6A47EE;
+  border-color: #6A47EE;
   color: #fff;
 }
 .dark .check-box { background: #221A13; border-color: #5A4A38; }
@@ -193,11 +297,11 @@
   background: linear-gradient(180deg, rgba(23, 18, 13, 0) 0%, rgba(23, 18, 13, 0.9) 100%);
 }
 
-/* Legacy round glass button, now cream */
+/* Legacy round glass button */
 .glass-btn-circle {
-  background: #FFFCF6;
-  border: 1px solid #F0E6D3;
-  box-shadow: 0 4px 12px rgba(86, 60, 30, 0.12);
+  background: #FFFFFF;
+  border: 1px solid #E4E0EF;
+  box-shadow: 0 4px 12px rgba(91, 61, 196, 0.10);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .dark .glass-btn-circle {
@@ -207,9 +311,9 @@
 .glass-btn-circle:active { transform: scale(0.92); }
 
 .hero-dial-button {
-  background: linear-gradient(180deg, #F38B45 0%, #E0621F 100%);
+  background: linear-gradient(180deg, #8467FA 0%, #6A47EE 100%);
   color: #ffffff;
-  box-shadow: 0 8px 24px rgba(224, 98, 31, 0.4);
+  box-shadow: 0 8px 24px rgba(106, 71, 238, 0.4);
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .hero-dial-button:active { transform: scale(0.94); }
@@ -221,9 +325,28 @@
 }
 .animate-pop-in { animation: pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
+/* Straight (no tilt) reveal for expanding card sections */
+@keyframes expand-in {
+  0% { transform: translateY(-4px); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+.animate-expand { animation: expand-in 0.2s ease-out both; }
+
+/* Intro splash: fade/scale in, zoom + fade out */
+@keyframes splash-in {
+  0% { opacity: 0; transform: scale(1.04); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes splash-out {
+  0% { opacity: 1; transform: none; filter: blur(0); }
+  100% { opacity: 0; transform: scale(1.12); filter: blur(6px); }
+}
+.splash-enter { animation: splash-in 0.5s ease-out both; }
+.splash-leave { animation: splash-out 0.65s cubic-bezier(0.4, 0, 0.2, 1) both; pointer-events: none; }
+
 /* Accessible focus ring */
 :focus-visible {
-  outline: 2px solid #E0621F;
+  outline: 2px solid #7C5CF8;
   outline-offset: 2px;
 }
 

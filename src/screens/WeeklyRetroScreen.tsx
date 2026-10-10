@@ -398,7 +398,7 @@ export const WeeklyRetroScreen: React.FC<WeeklyRetroScreenProps> = ({
                       >
                         Still needed
                       </button>
-                      {item.priority !== 'C' && (
+                      {item.priority !== 'low' && (
                         <button
                           type="button"
                           onClick={() => onAcknowledgeSittingTodo(item.id, 'demote')}

@@ -30,10 +30,10 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   if (!isOpen) return null;
 
   const presets = [
-    { label: '30 Coins', value: 30, color: 'amber' as TicketColorTheme, priority: 'A' as TodoPriority },
-    { label: '40 Coins', value: 40, color: 'yellow' as TicketColorTheme, priority: 'B' as TodoPriority },
-    { label: '50 Coins', value: 50, color: 'green' as TicketColorTheme, priority: 'C' as TodoPriority },
-    { label: '100 Coins', value: 100, color: 'blue' as TicketColorTheme, priority: 'A' as TodoPriority },
+    { label: '30 Coins', value: 30, color: 'amber' as TicketColorTheme, priority: 'high' as TodoPriority },
+    { label: '40 Coins', value: 40, color: 'yellow' as TicketColorTheme, priority: 'medium' as TodoPriority },
+    { label: '50 Coins', value: 50, color: 'green' as TicketColorTheme, priority: 'low' as TodoPriority },
+    { label: '100 Coins', value: 100, color: 'blue' as TicketColorTheme, priority: 'high' as TodoPriority },
   ];
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +41,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
     if (!text.trim()) return;
 
     const matchedPreset = presets.find((p) => p.value === coins);
-    const priority = matchedPreset ? matchedPreset.priority : (coins >= 50 ? 'A' : 'B');
+    const priority = matchedPreset ? matchedPreset.priority : (coins >= 50 ? 'high' : 'medium');
 
     const success = onAdd(text.trim(), priority, coins, category, colorTheme);
     if (success) {

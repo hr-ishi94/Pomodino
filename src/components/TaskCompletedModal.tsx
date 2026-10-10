@@ -16,7 +16,7 @@ export const TaskCompletedModal: React.FC<TaskCompletedModalProps> = ({ isOpen, 
       particleCount: 80,
       spread: 70,
       origin: { y: 0.45 },
-      colors: ['#F0B84A', '#E0621F', '#6B925F', '#FFFCF6'],
+      colors: ['#7C5CF8', '#B9A3FF', '#D5E08A', '#FFFFFF'],
     });
   }, [isOpen]);
 
@@ -31,29 +31,29 @@ export const TaskCompletedModal: React.FC<TaskCompletedModalProps> = ({ isOpen, 
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm rounded-[32px] overflow-hidden bg-gradient-to-b from-[#3B2A1C] to-[#221811] shadow-2xl"
+        className="relative w-full max-w-sm rounded-[32px] overflow-hidden bg-gradient-to-b from-[#F4F0FF] to-[#E9E1FF] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <img src={ART.celebrate} alt="" aria-hidden="true" className="w-full h-64 object-cover object-top" />
 
         {/* Tilted ticket */}
         <div className="relative -mt-14 mx-6 animate-pop-in">
-          <div className="card-honey rounded-2xl px-5 py-4 text-center border-2 border-honey-300 shadow-xl">
-            <p className="text-2xl font-extrabold text-warm-800 tracking-tight">Task Completed!</p>
+          <div className="card rounded-2xl px-5 py-4 text-center">
+            <p className="text-2xl font-extrabold text-ink tracking-tight">Task Completed!</p>
             <p className="text-sm font-semibold text-warm-600 mt-0.5 truncate">{taskName}</p>
             <div className="mt-2 inline-flex items-center gap-2">
               <CoinIcon className="w-8 h-8" />
-              <span className="text-2xl font-black text-warm-800">+{coins} coins</span>
+              <span className="text-2xl font-black text-ink">+{coins} coins</span>
             </div>
           </div>
         </div>
 
-        <p className="px-8 pt-6 text-center text-[15px] font-medium text-warm-100/90 leading-snug">
+        <p className="px-8 pt-6 text-center text-[15px] font-medium text-warm-700 leading-snug">
           “Small steps every day lead to big results.”
         </p>
 
         <div className="p-6 pt-5">
-          <button type="button" onClick={onClose} className="btn-primary w-full py-3.5 text-base">
+          <button type="button" onClick={onClose} className="btn-brand w-full h-14 text-base font-semibold">
             Nice!
           </button>
         </div>
