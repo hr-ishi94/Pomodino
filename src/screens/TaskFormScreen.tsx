@@ -44,28 +44,27 @@ const PickerPill: React.FC<{
   const ref = useRef<HTMLInputElement>(null);
   return (
     <div className="relative flex-1 min-w-0">
-      <button
-        type="button"
-        onClick={() => {
-          try {
-            ref.current?.showPicker();
-          } catch {
-            ref.current?.focus();
-          }
-        }}
+      <div
         className="field flex items-center gap-2 text-left !px-4"
       >
         {icon}
         <span className={`truncate ${value ? 'text-ink' : 'text-[#8E89A0]'}`}>{display}</span>
-      </button>
+      </div>
       <input
         ref={ref}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        className="absolute inset-0 opacity-0 pointer-events-none"
-        tabIndex={-1}
+        onClick={() => {
+          try {
+            ref.current?.showPicker();
+          } catch {
+            /* native picker opens on its own */
+          }
+        }}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+
       />
     </div>
   );

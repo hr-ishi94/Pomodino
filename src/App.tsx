@@ -485,6 +485,7 @@ export function App() {
     const setId = routineSetIdFor(d);
     setAppData((prev) => ({
       ...prev,
+      routineBlocks: setId === 'set-weekday' ? blocks : prev.routineBlocks,
       routineSets: prev.routineSets.some((s) => s.id === setId)
         ? prev.routineSets.map((s) => (s.id === setId ? { ...s, blocks } : s))
         : [...prev.routineSets, { id: setId, name: 'Routine', blocks }],
