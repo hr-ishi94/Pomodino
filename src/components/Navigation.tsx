@@ -52,11 +52,11 @@ export const Navigation: React.FC<NavigationProps> = ({ currentTab, onTabChange 
             onClick={() => onTabChange('pomodoro')}
             aria-label="Focus timer"
             aria-current={focusActive ? 'page' : undefined}
-            className={`btn-brand btn-glow w-[72px] h-[72px] border-[3px] border-white transition-all ${
+            className={`btn-brand btn-glow w-[84px] h-[84px] shrink-0 border-[3px] border-white transition-all ${
               focusActive ? 'ring-4 ring-lime-300' : ''
             }`}
           >
-            <img src="/pomo-dino.png" alt="" aria-hidden="true" className="w-[58px] h-[58px] object-contain select-none" draggable={false} />
+            <img src="/pomo-dino.png" alt="" aria-hidden="true" className="w-[84px] h-[84px] object-contain select-none" draggable={false} />
           </button>
         </div>
 

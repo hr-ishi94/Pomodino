@@ -476,7 +476,7 @@ export function getRoutineBlocksForDate(appData: AppData, d: Date = new Date()):
   const dayOfWeek = d.getDay() as DayOfWeek;
   const setId = appData.routineSchedule?.[dayOfWeek] || 'set-weekday';
   const matchedSet = appData.routineSets?.find((s) => s.id === setId);
-  if (matchedSet && matchedSet.blocks && matchedSet.blocks.length > 0) {
+  if (matchedSet && Array.isArray(matchedSet.blocks)) {
     return matchedSet.blocks;
   }
   // Fallback to legacy routineBlocks or weekday
