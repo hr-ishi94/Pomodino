@@ -1,62 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, Plus, Star, Trash2, X } from 'lucide-react';
+import { BAD_HABITS_KEY, CELLS, TARGET_DAYS, loadBadHabits, targetDate, toLocalInput } from '../lib/badHabits';
+import type { BadHabit } from '../lib/badHabits';
 
-const STORAGE_KEY = 'focus-bad-habits';
-
-interface BadHabit {
-  id: string;
-  aim: string;
-  motive: string;
-  createdAt: string;
-  checked: string[]; // cell ids
-}
-
-interface Cell {
-  id: string;
-  value: string;
-  unit: string;
-  milestone: boolean; // gets a full green fill when checked
-}
-
-const HOUR_CELLS: Cell[] = [
-  { id: '20m', value: '20', unit: 'min', milestone: true },
-  { id: '2h', value: '2', unit: 'hrs', milestone: true },
-  { id: '4h', value: '4', unit: 'hrs', milestone: true },
-  { id: '8h', value: '8', unit: 'hrs', milestone: true },
-  { id: '12h', value: '12', unit: 'hrs', milestone: true },
-  { id: '24h', value: '24', unit: 'hrs', milestone: true },
-  { id: '48h', value: '48', unit: 'hrs', milestone: true },
-];
-
-const MILESTONE_DAYS = new Set([3, 5, 7, 10, 14, 21, 28, 30, 40, 50, 60, 75, 90]);
-
-const CELLS: Cell[] = [
-  ...HOUR_CELLS,
-  ...Array.from({ length: 88 }, (_, i) => {
-    const day = i + 3;
-    return { id: `d${day}`, value: String(day), unit: 'day', milestone: MILESTONE_DAYS.has(day) };
-  }),
-];
-
-function loadHabits(): BadHabit[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+const fmt = (d: Date, dateOnly = false) =>
+  d.toLocaleString('en-US', dateOnly
+    ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }
+    : { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 export const BadHabitBreaker: React.FC = () => {
-  const [habits, setHabits] = useState<BadHabit[]>(loadHabits);
+  const [habits, setHabits] = useState<BadHabit[]>(loadBadHabits);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
   const [aim, setAim] = useState('');
   const [motive, setMotive] = useState('');
+  const [lastAt, setLastAt] = useState(() => toLocalInput(new Date()));
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+      localStorage.setItem(BAD_HABITS_KEY, JSON.stringify(habits));
     } catch (err) {
       console.error('Failed to save bad habits to localStorage:', err);
     }
@@ -78,12 +40,14 @@ export const BadHabitBreaker: React.FC = () => {
       aim: aim.trim(),
       motive: motive.trim(),
       createdAt: new Date().toISOString(),
+      lastBadHabitAt: (lastAt ? new Date(lastAt) : new Date()).toISOString(),
       checked: [],
     };
     setHabits((prev) => [habit, ...prev]);
     setExpanded((prev) => new Set(prev).add(habit.id));
     setAim('');
     setMotive('');
+    setLastAt(toLocalInput(new Date()));
     setCreating(false);
   };
 
@@ -144,6 +108,16 @@ export const BadHabitBreaker: React.FC = () => {
               className="field !px-4 !py-2.5 !bg-warm-50 !border-warm-200 !text-[13px]"
             />
           </label>
+          <label className="block">
+            <span className="block mb-1.5 text-[12px] font-medium text-warm-600">Last bad habit (date &amp; time)</span>
+            <input
+              type="datetime-local"
+              value={lastAt}
+              max={toLocalInput(new Date())}
+              onChange={(e) => setLastAt(e.target.value)}
+              className="field !h-10 !px-4 !bg-warm-50 !border-warm-200 !text-[13px]"
+            />
+          </label>
           <button type="submit" className="btn-pill w-full" disabled={!aim.trim()}>
             Create breakdown
           </button>
@@ -176,6 +150,17 @@ export const BadHabitBreaker: React.FC = () => {
 
             {isOpen && (
               <div className="mt-3 animate-expand space-y-3">
+                <div className="grid grid-cols-2 gap-2 text-[12px]">
+                  <div className="rounded-2xl bg-warm-50 px-3 py-2.5">
+                    <span className="block text-warm-600">Last bad habit</span>
+                    <span className="block font-semibold text-ink">{fmt(new Date(habit.lastBadHabitAt))}</span>
+                  </div>
+                  <div className="rounded-2xl bg-lime-100 px-3 py-2.5">
+                    <span className="block text-warm-600">{TARGET_DAYS}-day target</span>
+                    <span className="block font-semibold text-ink">{fmt(targetDate(habit), true)}</span>
+                  </div>
+                </div>
+
                 {habit.motive && (
                   <p className="text-[12px] text-warm-700 bg-warm-50 rounded-2xl px-3 py-2.5 whitespace-pre-wrap">
                     <span className="font-semibold text-ink">Motive: </span>
