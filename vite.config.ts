@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'logo.png'],
       manifest: {
-        name: 'Daily Focus — ADHD Routine Tracker',
-        short_name: 'Daily Focus',
-        description: 'A low-friction, single-focus routine tracker built for ADHD.',
+        name: 'Pomodino - Make time for what matters',
+        short_name: 'Pomodino',
+        description: 'Pomodino - Make time for what matters.',
         theme_color: '#FAF9F6',
         background_color: '#FAF9F6',
         display: 'standalone',
