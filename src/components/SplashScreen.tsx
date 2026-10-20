@@ -19,7 +19,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onDone }) => {
 
   useEffect(() => {
     const fallback = setTimeout(finish, MAX_MS);
-    videoRef.current?.play().catch(() => setVideoFailed(true));
+    videoRef.current?.play().catch((err: unknown) => {
+      // An interrupted play() (AbortError) means a reload is under way, not that autoplay is blocked
+      if (!(err instanceof DOMException && err.name === 'AbortError')) setVideoFailed(true);
+    });
     return () => clearTimeout(fallback);
   }, [finish]);
 
@@ -55,11 +58,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onDone }) => {
         playsInline
         preload="auto"
         onEnded={finish}
+        onPlaying={() => setVideoFailed(false)}
         onError={() => setVideoFailed(true)}
-        className={`w-full h-full object-cover ${videoFailed ? 'invisible' : ''}`}
+        className="w-full h-full object-cover"
       />
       {videoFailed && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 animate-expand">
+        <div className="absolute inset-0 bg-[#17161D] flex flex-col items-center justify-center gap-5 animate-expand">
           <img src="/pomo-dino.png" alt="" aria-hidden="true" className="w-44 h-44 rounded-full select-none" draggable={false} />
           <p className="text-white text-[18px] font-semibold tracking-tight">Pomodino</p>
           <p className="text-white/70 text-[13px] -mt-3">Make time for what matters</p>
