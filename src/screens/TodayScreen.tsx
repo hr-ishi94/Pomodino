@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { MilestoneBanner } from '../components/MilestoneBanner';
 import { Bell, Plus, ClipboardList, ClipboardCheck, Clipboard } from 'lucide-react';
 import type { TodoItem, TodoStatus } from '../types';
 import { STATUS_ORDER, compareTasks, greeting, isTaskForDay } from '../lib/tasks';
@@ -154,6 +155,8 @@ export const TodayScreen: React.FC<TodayScreenProps> = ({
           </button>
         </div>
       </header>
+
+      <MilestoneBanner />
 
       <h1 className="text-[27px] leading-[1.2] tracking-tight text-ink">
         <span className="font-normal">Let's Make</span>

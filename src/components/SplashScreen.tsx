@@ -8,18 +8,27 @@ interface SplashScreenProps {
 
 const EXIT_MS = 650;
 const MAX_MS = 12000; // safety net if the video never ends
+const FALLBACK_MS = 3000; // hold the logo this long when the video can't autoplay (e.g. installed PWA)
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onDone }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [leaving, setLeaving] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
 
   const finish = useCallback(() => setLeaving(true), []);
 
   useEffect(() => {
     const fallback = setTimeout(finish, MAX_MS);
-    videoRef.current?.play().catch(finish);
+    videoRef.current?.play().catch(() => setVideoFailed(true));
     return () => clearTimeout(fallback);
   }, [finish]);
+
+  // No video (autoplay blocked or load error): keep the splash up for a moment instead of vanishing
+  useEffect(() => {
+    if (!videoFailed) return;
+    const t = setTimeout(finish, FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [videoFailed, finish]);
 
   // Keep the latest callback without restarting the exit timer on parent re-renders
   const onDoneRef = useRef(onDone);
@@ -46,9 +55,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onDone }) => {
         playsInline
         preload="auto"
         onEnded={finish}
-        onError={finish}
-        className="w-full h-full object-cover"
+        onError={() => setVideoFailed(true)}
+        className={`w-full h-full object-cover ${videoFailed ? 'invisible' : ''}`}
       />
+      {videoFailed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 animate-expand">
+          <img src="/pomo-dino.png" alt="" aria-hidden="true" className="w-44 h-44 rounded-full select-none" draggable={false} />
+          <p className="text-white text-[18px] font-semibold tracking-tight">Pomodino</p>
+          <p className="text-white/70 text-[13px] -mt-3">Make time for what matters</p>
+        </div>
+      )}
       <button
         type="button"
         onClick={finish}
