@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, Plus, Star, Trash2, X } from 'lucide-react';
-import { BAD_HABITS_KEY, CELLS, TARGET_DAYS, loadBadHabits, targetDate, toLocalInput } from '../lib/badHabits';
+import { BAD_HABITS_KEY, CELLS, TARGET_DAYS, loadBadHabits, reachedIds, targetDate, toLocalInput } from '../lib/badHabits';
 import type { BadHabit } from '../lib/badHabits';
 
 const fmt = (d: Date, dateOnly = false) =>
@@ -11,10 +11,16 @@ const fmt = (d: Date, dateOnly = false) =>
 export const BadHabitBreaker: React.FC = () => {
   const [habits, setHabits] = useState<BadHabit[]>(loadBadHabits);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [now, setNow] = useState(() => Date.now());
   const [creating, setCreating] = useState(false);
   const [aim, setAim] = useState('');
   const [motive, setMotive] = useState('');
   const [lastAt, setLastAt] = useState(() => toLocalInput(new Date()));
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     try {
@@ -130,7 +136,8 @@ export const BadHabitBreaker: React.FC = () => {
 
       {habits.map((habit) => {
         const isOpen = expanded.has(habit.id);
-        const doneCount = habit.checked.length;
+        const reached = reachedIds(habit, now);
+        const doneCount = CELLS.filter((cell) => reached.has(cell.id) || habit.checked.includes(cell.id)).length;
         return (
           <div key={habit.id} className="card p-4">
             <button
@@ -170,7 +177,8 @@ export const BadHabitBreaker: React.FC = () => {
 
                 <div className="grid grid-cols-5 gap-2">
                   {CELLS.map((cell) => {
-                    const checked = habit.checked.includes(cell.id);
+                    const auto = reached.has(cell.id);
+                    const checked = auto || habit.checked.includes(cell.id);
                     const tone = checked ? (cell.milestone ? 'habit-cell-win' : 'habit-cell-done') : '';
                     return (
                       <button
@@ -179,6 +187,8 @@ export const BadHabitBreaker: React.FC = () => {
                         role="checkbox"
                         aria-checked={checked}
                         aria-label={`${cell.value} ${cell.unit}${cell.milestone ? ' milestone' : ''}`}
+                        disabled={auto}
+                        title={auto ? 'Reached automatically' : undefined}
                         onClick={() => toggleCell(habit.id, cell.id)}
                         className={`habit-cell ${tone}`}
                       >

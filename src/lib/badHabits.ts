@@ -16,12 +16,17 @@ export interface Cell {
   value: string;
   unit: string;
   label: string;
+  ms: number; // time since the last bad habit at which this cell is reached
   milestone: boolean; // gets a full green fill when checked
 }
 
+const MIN = 60_000;
+const HOUR = 60 * MIN;
+const DAY = 24 * HOUR;
+
 const HOUR_CELLS: Cell[] = [
-  { id: '20m', value: '20', unit: 'min', label: '20 minute', milestone: true },
-  ...[2, 4, 8, 12, 24, 48].map((h) => ({ id: `${h}h`, value: String(h), unit: 'hrs', label: `${h} hour`, milestone: true })),
+  { id: '20m', value: '20', unit: 'min', label: '20 minute', ms: 20 * MIN, milestone: true },
+  ...[2, 4, 8, 12, 24, 48].map((h) => ({ id: `${h}h`, value: String(h), unit: 'hrs', label: `${h} hour`, ms: h * HOUR, milestone: true })),
 ];
 
 const MILESTONE_DAYS = new Set([3, 5, 7, 10, 14, 21, 28, 30, 40, 50, 60, 75, 90]);
@@ -30,7 +35,7 @@ export const CELLS: Cell[] = [
   ...HOUR_CELLS,
   ...Array.from({ length: 88 }, (_, i) => {
     const day = i + 3;
-    return { id: `d${day}`, value: String(day), unit: 'day', label: `${day} day`, milestone: MILESTONE_DAYS.has(day) };
+    return { id: `d${day}`, value: String(day), unit: 'day', label: `${day} day`, ms: day * DAY, milestone: MILESTONE_DAYS.has(day) };
   }),
 ];
 
@@ -56,10 +61,17 @@ export function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** Latest checked milestone for each habit that has one */
-export function attainedMilestones(habits: BadHabit[]): { aim: string; label: string }[] {
+/** Cell ids the clock has already reached, counted from the last bad habit */
+export function reachedIds(h: BadHabit, now: number): Set<string> {
+  const elapsed = now - new Date(h.lastBadHabitAt).getTime();
+  return new Set(CELLS.filter((c) => elapsed >= c.ms).map((c) => c.id));
+}
+
+/** Latest checked milestone for each habit that has one (manual ticks plus time reached) */
+export function attainedMilestones(habits: BadHabit[], now = Date.now()): { aim: string; label: string }[] {
   return habits.flatMap((h) => {
-    const last = [...CELLS].reverse().find((c) => c.milestone && h.checked.includes(c.id));
+    const reached = reachedIds(h, now);
+    const last = [...CELLS].reverse().find((c) => c.milestone && (reached.has(c.id) || h.checked.includes(c.id)));
     return last ? [{ aim: h.aim, label: last.label }] : [];
   });
 }
