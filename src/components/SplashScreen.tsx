@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { SkipForward } from 'lucide-react';
 import introVideo from '../assets/intro_video.mp4';
 
 interface SplashScreenProps {
@@ -51,9 +52,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onDone }) => {
       <button
         type="button"
         onClick={finish}
-        className="absolute top-5 right-5 safe-top h-9 px-4 rounded-full bg-white/20 backdrop-blur text-white text-[12px] font-semibold border border-white/30"
+        aria-label="Skip intro"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.25rem)', right: '1.25rem' }}
+        className="absolute w-12 h-12 p-0 rounded-full flex items-center justify-center bg-white/90 text-ink shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur transition-transform hover:scale-105 active:scale-95"
       >
-        Skip
+        <SkipForward className="w-5 h-5 block" fill="currentColor" />
       </button>
     </div>
   );
