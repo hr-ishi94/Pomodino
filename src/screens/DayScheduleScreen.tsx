@@ -22,6 +22,7 @@ import { formatTimeFriendly, formatTimeRange, timeToMinutes } from '../lib/time'
 import { blockArea, compareTasks, isTaskForDay, taskArea } from '../lib/tasks';
 import { Checkbox } from '../components/ui';
 import { PriorityBadge, StatusChip } from '../components/TaskCard';
+import { BadHabitBreaker } from '../components/BadHabitBreaker';
 
 interface DayScheduleScreenProps {
   todos: TodoItem[];
@@ -352,6 +353,8 @@ export const DayScheduleScreen: React.FC<DayScheduleScreenProps> = ({
           </button>
         </div>
       </header>
+
+      <BadHabitBreaker />
 
       <div className="flex items-end justify-between gap-3">
         <h1 className="text-[27px] leading-[1.2] tracking-tight text-ink">
